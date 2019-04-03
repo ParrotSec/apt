@@ -1,3 +1,9 @@
+apt (1.8.0+parrot1) testing; urgency=medium
+
+  * Allow https to http downgrade for https mirrordirectors with http mirrors.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 03 Apr 2019 03:06:03 +0200
+
 apt (1.8.0) unstable; urgency=medium
 
   [ David Kalnischkies ]
