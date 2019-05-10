@@ -1,3 +1,19 @@
+apt (1.8.1+parrot1) testing; urgency=medium
+
+  * Import new Debian release.
+  * Re-apply https downgrade patch.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Fri, 10 May 2019 21:47:56 +0200
+
+apt (1.8.1) unstable; urgency=medium
+
+  * Add test case for local-only packages pinned to never
+  * Prevent shutdown while running dpkg (LP: #1820886)
+  * Add linux-{buildinfo,image-unsigned,source} versioned kernel pkgs
+    (LP: #1821640)
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 06 May 2019 10:41:52 +0200
+
 apt (1.8.0+parrot1) testing; urgency=medium
 
   * Allow https to http downgrade for https mirrordirectors with http mirrors.
