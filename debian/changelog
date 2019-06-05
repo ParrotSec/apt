@@ -1,3 +1,9 @@
+apt (1.8.2+parrot2) testing; urgency=medium
+
+  * Update CI Configuration.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 05 Jun 2019 16:27:38 +0200
+
 apt (1.8.2+parrot1) testing; urgency=medium
 
   * Import new Debian release.
