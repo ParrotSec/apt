@@ -1,3 +1,54 @@
+apt (1.8.2+parrot2) testing; urgency=medium
+
+  * Update CI Configuration.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 05 Jun 2019 16:27:38 +0200
+
+apt (1.8.2+parrot1) testing; urgency=medium
+
+  * Import new Debian release.
+  * Re-apply https downgrade patch.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 05 Jun 2019 15:47:44 +0200
+
+apt (1.8.2) unstable; urgency=medium
+
+  [ Alwin Henseler ]
+  * Flip /: in documented default value of DPkg::Path (Closes: #917986)
+
+  [ TilmanK ]
+  * Fix typo in German manpage translation
+
+  [ Américo Monteiro ]
+  * Portuguese manpages translation update (Closes: #926614)
+
+  [ Jean-Pierre Giraud ]
+  * French manpages translation update (Closes: #929290)
+
+  [ Michael Zhivich ]
+  * methods: https: handle requests for TLS re-handshake (LP: #1829861)
+
+  [ Julian Andres Klode ]
+  * Unlock dpkg locks in reverse locking order (LP: #1829860)
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 28 May 2019 16:40:29 +0200
+
+apt (1.8.1+parrot1) testing; urgency=medium
+
+  * Import new Debian release.
+  * Re-apply https downgrade patch.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Fri, 10 May 2019 21:47:56 +0200
+
+apt (1.8.1) unstable; urgency=medium
+
+  * Add test case for local-only packages pinned to never
+  * Prevent shutdown while running dpkg (LP: #1820886)
+  * Add linux-{buildinfo,image-unsigned,source} versioned kernel pkgs
+    (LP: #1821640)
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 06 May 2019 10:41:52 +0200
+
 apt (1.8.0) unstable; urgency=medium
 
   [ David Kalnischkies ]
