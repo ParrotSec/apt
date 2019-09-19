@@ -69,6 +69,7 @@ add_optional_compile_options(Wnoexcept)
 add_optional_compile_options(Wsign-promo)
 add_optional_compile_options(Wundef)
 add_optional_compile_options(Wdouble-promotion)
+add_optional_compile_options(Werror=return-type)
 
 # apt-ftparchive dependencies
 find_package(BerkeleyDB REQUIRED)
@@ -193,7 +194,7 @@ check_cxx_target(HAVE_FMV_SSE42_AND_CRC32DI "sse4.2" "__builtin_ia32_crc32di(0, 
 # Configure some variables like package, version and architecture.
 set(PACKAGE ${PROJECT_NAME})
 set(PACKAGE_MAIL "APT Development Team <deity@lists.debian.org>")
-set(PACKAGE_VERSION "1.8.3")
+set(PACKAGE_VERSION "1.8.4")
 
 if (NOT DEFINED DPKG_DATADIR)
   execute_process(COMMAND ${PERL_EXECUTABLE} -MDpkg -e "print $Dpkg::DATADIR;"

@@ -1,15 +1,13 @@
-apt (1.8.3+parrot2) rolling; urgency=medium
+apt (1.8.4) unstable; urgency=medium
 
-  * Rebuild package for rolling branch.
+  * CMake: Pass -Werror=return-type to gcc
+  * apt.systemd.daily: Do not numerically check if intervals equal 0
+    (LP: #1840995)
+  * Pass --abort-after=1 to dpkg when using --force-depends (Closes: #935910)
+    (LP: #1844634)
+  * Fix use of GTest to adjust for GTest 1.9
 
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sun, 18 Aug 2019 17:58:22 +0200
-
-apt (1.8.3+parrot1) rolling; urgency=medium
-
-  * Import new Debian release.
-  * Re-allow https-to-http downgrades.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Thu, 15 Aug 2019 23:29:08 +0200
+ -- Julian Andres Klode <jak@debian.org>  Thu, 19 Sep 2019 22:06:45 +0200
 
 apt (1.8.3) unstable; urgency=medium
 
@@ -20,19 +18,6 @@ apt (1.8.3) unstable; urgency=medium
   * Do not include squashfs file systems in df output. (LP: #1756595)
 
  -- Julian Andres Klode <jak@debian.org>  Fri, 09 Aug 2019 11:16:15 +0200
-
-apt (1.8.2+parrot2) testing; urgency=medium
-
-  * Update CI Configuration.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 05 Jun 2019 16:27:38 +0200
-
-apt (1.8.2+parrot1) testing; urgency=medium
-
-  * Import new Debian release.
-  * Re-apply https downgrade patch.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 05 Jun 2019 15:47:44 +0200
 
 apt (1.8.2) unstable; urgency=medium
 
@@ -55,13 +40,6 @@ apt (1.8.2) unstable; urgency=medium
   * Unlock dpkg locks in reverse locking order (LP: #1829860)
 
  -- Julian Andres Klode <jak@debian.org>  Tue, 28 May 2019 16:40:29 +0200
-
-apt (1.8.1+parrot1) testing; urgency=medium
-
-  * Import new Debian release.
-  * Re-apply https downgrade patch.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Fri, 10 May 2019 21:47:56 +0200
 
 apt (1.8.1) unstable; urgency=medium
 
