@@ -1,3 +1,9 @@
+apt (1.8.4+parrot1+lts1) lts-updates; urgency=medium
+
+  * Import new Parrot Rolling release.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Mon, 03 Feb 2020 03:32:42 +0100
+
 apt (1.8.4+parrot1) rolling; urgency=medium
 
   * Import new Debian version.
