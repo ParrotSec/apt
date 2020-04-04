@@ -1,3 +1,305 @@
+apt (2.0.1+parrot1) rolling-testing; urgency=medium
+
+  * Import new Debian version.
+  * Apply https->http redirection patch
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@localhost.localdomain>  Sat, 04 Apr 2020 15:43:29 +0200
+
+apt (2.0.1) unstable; urgency=medium
+
+  [ David Kalnischkies ]
+  * Don't crash pattern matching sections if pkg has no section
+  * Parse last line in deb file correctly by adding a newline
+
+  [ Julian Andres Klode ]
+  * apt-helper: Add analyze-pattern helper
+  * Add color highlighting to E:/W:/N: prefixes (Closes: #953527)
+
+  [ Алексей Шилин ]
+  * Russian program translation update (Closes: #953804)
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 24 Mar 2020 11:53:30 +0100
+
+apt (2.0.0+parrot1) rolling-testing; urgency=medium
+
+  * Apply https->http redirection patch on new version.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@localhost.localdomain>  Tue, 31 Mar 2020 04:44:44 +0200
+
+apt (2.0.0) unstable; urgency=medium
+
+  * Upload to unstable - Happy APT 2.0 day!
+  * GetLock: No strerror if it's just another process holding the lock
+  * Show absolute time while waiting for lock instead of %, rework message
+
+ -- Julian Andres Klode <jak@debian.org>  Sat, 07 Mar 2020 21:19:53 +0100
+
+apt (1.9.12) experimental; urgency=medium
+
+  * pkgcache: Add operator bool() to map_pointer
+  * (temporarily) unhide pkgDPkgPM again to have python-apt compile
+
+ -- Julian Andres Klode <jak@debian.org>  Thu, 27 Feb 2020 15:06:56 +0100
+
+apt (1.9.11) experimental; urgency=medium
+
+  [ Tomáš Janoušek ]
+  * bash completion: Add autopurge command
+
+  [ Tris Emmy Wilson ]
+  * apt-mark: don't lie about successful marks
+
+  [ Julian Andres Klode ]
+  * apt(8): Wait for lock (Closes: #754103)
+  * policy: Implement pinning by source package (Closes: #166032)
+  * Initialize libgcrypt on first use (Closes: #949074)
+  * Fix various compiler warnings
+  * Bump ABI to 6.0; update symbols file; cleanup ABI:
+    - Merge various function overloads together
+    - Make stuff that should be virtual virtual
+    - Default to hidden visibility
+  * Code removals:
+    - Use a 32-bit djb VersionHash instead of CRC-16
+    - Remove CRC-16 implementation
+  * Hardening:
+    - tagfile: Check if memchr() returned null before using
+    - tagfile: Check out-of-bounds access to Tags vector
+  * Cache improvements:
+    - Type safe cache: Replace map_pointer_t with map_pointer<T>
+    - Extensibility: Add d-pointers to groups, packages, versions, and files
+    - Prepare for package hashtable removal: Swap locations of hashtables
+
+  [ Nis Martensen ]
+  * apt-pkg/srcrecords.cc: 'source' means 'deb-src' in error message
+
+  [ David Kalnischkies ]
+  * Parse records including empty tag names correctly
+
+ -- Julian Andres Klode <jak@debian.org>  Wed, 26 Feb 2020 21:29:48 +0100
+
+apt (1.9.10) experimental; urgency=medium
+
+  [ David Kalnischkies ]
+  * Fix remaining usec vs sec time-delta calculation typos.
+    Thanks to Trent W. Buck for initial patch (Closes: #950776)
+
+  [ Julian Andres Klode ]
+  * seccomp: Allow time64 variants (>402,<415) of allowed syscalls
+    (Closes: #951012)
+  * debian/control: Bump libseccomp-dev Build-Depends to >= 2.4.2
+  * seccomp: Allow recvmmsg_time64() and futex_time64()
+  * policy: Add SetPriority() methods
+  * Revert "Add a Packages-Require-Authorization Release file field"
+
+  [ Michael Vogt ]
+  * doc: remove "WIP" from apt.8.xml
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 18 Feb 2020 12:32:42 +0100
+
+apt (1.9.9) experimental; urgency=medium
+
+  * Widen regular expressions for versioned kernel packages (LP: #1607845)
+  * Implement short patterns (patterns starting with ~)
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 04 Feb 2020 17:42:21 +0100
+
+apt (1.9.8) experimental; urgency=medium
+
+  * pkgcache.cc: Mix PACKAGE_VERSION into the cache hash
+  * mmap: Do not look for empty pool unless we need to
+  * apt-verbatim.ent: Update ubuntu-codename from disco to focal
+  * NewGroup: Create GrpIterator after allocation (fix segfault)
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 27 Jan 2020 13:25:52 +0100
+
+apt (1.9.7) experimental; urgency=medium
+
+  * Trim trailing whitespace (thanks lintian-brush)
+  * NewProvidesAllArch: Check if group is empty before using it.
+    This caused automake-1.16 to not be provided by automake anymore,
+    because apt wanted to add provides to packages in an empty automake-1.16
+    group. LP: #1859952
+  * Fix debian-rules-uses-deprecated-systemd-override.
+    We accidentally managed to restart apt-daily{,-upgrade}.service
+    again because our dh_systemd_start override was being ignored
+    since we switched to debhelper 12. Override dh_installsystemd
+    instead.
+
+ -- Julian Andres Klode <jak@debian.org>  Thu, 16 Jan 2020 12:13:50 +0100
+
+apt (1.9.6) experimental; urgency=medium
+
+  [ Julian Andres Klode ]
+  * gitlab-ci: Do not do coverage
+  * gitlab-ci: Use ccache
+  * satisfy: Fix segmentation fault when called with empty argument
+  * Add support for GTest 1.9, do not fail silently if its missing
+  * gtests: Fix netrc parser test regression from https-only changes
+  * Macro cleanup:
+    - Avoid #define _error, use anonymous C++ struct instead (Closes: #948338)
+    - Rename _count() macro to APT_ARRAY_SIZE()
+    - Remove various unused macros like MAX/MIN/ABS/APT_CONST
+    - Only define likely/unlikely if APT_COMPILING_APT set
+  * Performance: Avoid extra out-of-cache hash table deduplication for
+    package names, this saved about 10-16% on gencaches in memory
+  * acquire: Move queue startup after calling log's Start(), fixes abort()
+    calls in python-apt
+  * hashes: Use Libgcrypt for hashing purposes
+    - Raise buffer size for Hashes::AddFD() from 4 KiB to 64 KiB
+    - Convert users of {MD5,SHA1,SHA256,SHA512}Summation to use Hashes
+    - Deprecate the Summation classes and mark them for removal
+    - Remove includes of (md5|sha1|sha2).h headers
+  * netrc: Add warning when ignoring entries for unencrypted protocols
+  * apt(8): Disable regular expressions and fnmatch
+
+  [ David Kalnischkies ]
+  * Drop g++ build-dependency to help crossbuilding (Closes: #948201)
+
+  [ Denis Mosolov ]
+  * Fix typo in README.md
+
+ -- Julian Andres Klode <jak@debian.org>  Wed, 15 Jan 2020 23:06:49 +0100
+
+apt (1.9.5) experimental; urgency=medium
+
+  [ Julian Andres Klode ]
+  * Parse 'show' arguments for the 'info' alias as well (LP: #1843812)
+  * patterns: Add base class for regular expression matching
+  * patterns: Add ?version
+  * patterns: Add ?source-name and ?source-version
+  * patterns: Add ?archive
+  * patterns: Add ?origin
+  * patterns: Add ?any-version
+  * patterns: Implement ?narrow(...), as ?any-version(?and(...))
+  * patterns: Add ?all-versions
+  * patterns: Add ?section
+  * netrc: Restrict auth.conf entries to https by default (Closes: #945911)
+
+  [ Anatoly Borodin ]
+  * README.md: fix dead anonscm link
+
+  [ Алексей Шилин ]
+  * Search in all available description translations (Closes: #490000)
+  * strutl: Add APT::String::DisplayLength() function
+  * Fix progress bar width for multibyte charsets
+
+  [ Chris Leick ]
+  * German manpage translation update
+
+  [ David Kalnischkies ]
+  * Use correct filename on IMS-hit reverify for indices
+  * Remove failed trusted signature instead of index on IMS hit
+
+  [ Anthony Papillon ]
+  * Fix a mistake in man french translation
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 02 Dec 2019 18:17:56 +0100
+
+apt (1.9.4) experimental; urgency=medium
+
+  * CMake: Pass -Werror=return-type to gcc
+  * CMake: Produce a fatal error if triehash could not be found
+  * apt.systemd.daily: Do not numerically check if intervals equal 0
+    (LP: #1840995)
+  * srvrec: Use re-entrant resolver functions
+  * Pass --abort-after=1 to dpkg when using --force-depends (Closes: #935910)
+    (LP: #1844634)
+  * Fix use of GTest to adjust for GTest 1.9
+
+ -- Julian Andres Klode <jak@debian.org>  Thu, 19 Sep 2019 11:13:47 +0200
+
+apt (1.9.3) experimental; urgency=medium
+
+  * Fix segfault in pkgAcquire::Enqueue() with Acquire::Queue-Mode=access
+    (LP: #1839714)
+  * test: Use valgrind to ensure Acquire::Queue-Mode=access does not crash
+  * Add initial support for package patterns (patterns on versions WIP)
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 19 Aug 2019 16:21:20 +0200
+
+apt (1.9.2) experimental; urgency=medium
+
+  [ Julian Andres Klode ]
+  * Improve locking messaging - pid and name, "do not remove lock file"
+
+  [ Lynn Cyrin ]
+  * Change a pronoun in the readme from `he` to `they`
+
+  [ David Kalnischkies ]
+  * Distribute host-less work based on backlog of the queues
+  * Show details about the package with bad Provides
+  * Apply various suggestions by cppcheck
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 05 Aug 2019 21:26:10 +0200
+
+apt (1.9.1) experimental; urgency=medium
+
+  * RFC1123StrToTime: Accept const std::string& as first argument
+  * Fix pkg-config-test autopkgtest
+
+ -- Julian Andres Klode <jak@debian.org>  Thu, 20 Jun 2019 17:53:14 +0200
+
+apt (1.9.0) experimental; urgency=medium
+
+  [ Julian Andres Klode ]
+  * CMakeLists.txt: Bump C++ standard version to C++14
+  * debian: Update to debhelper-compat (= 12)
+  * debian/rules: Do not use dh_install --list-missing (dh 12 porting)
+  * Remove all the deprecated bits, merge various function prototypes together
+  * prepare-release: Add merge-translations command
+  * Use system-provided triehash
+  * CI: Use unstable for now, as we need triehash package
+  * Tighten dependencies from apt and apt-utils on libs
+  * Add test case for local-only packages pinned to never
+  * acq: worker: Move CurrentSize, TotalSize, ResumePoint to CurrentItem
+  * apt-helper: Support multiple hashes for a file
+  * Add 'explicit' to most single argument constructors
+  * Get rid of pkgExtract and pkgFLCache
+  * Merge libapt-inst into libapt-pkg
+  * Use debDebFile to get control file instead of dpkg-deb
+  * prepare-release: Add bump-abi command
+  * Change soname to libapt-pkg.so.5.90
+  * CMake: Enforce "override" use on overridden methods
+  * debmetaindex: Use isspace_ascii() variant to normalize Signed-By
+  * README.md: Quote -j <count> as code with backticks
+  * apt-mark: Add hidden showheld alias for showhold
+  * Mnor wording improvements in documentation
+  * Make APT::StringView public, replace std::string with it in various places
+  * Introduce apt satisfy and apt-get satisfy (Closes: #275379)
+  * Run unifdef -DAPT_{8,9,10,15}_CLEANER_HEADERS
+  * Adjust code for missing includes, and using std::string
+  * Bump cache MajorVersion to 16
+
+  [ Corentin Noël ]
+  * Add pkg-config files for the apt-pkg and apt-inst libraries
+    (Closes: #439121)
+
+  [ Simon McVittie ]
+  * vendor/getinfo: Iterate through vendors in lexicographic order
+    (Closes: #924662)
+  * vendor/getinfo: Don't assume that Ubuntu is the last vendor
+    (Closes: #924662)
+
+  [ Martin Michlmayr ]
+  * Perform minor copy-editing on the docs
+
+  [ Ivan Krylov ]
+  * Mark apt-transport-https as M-A:foreign (Closes: #905141)
+
+  [ David Kalnischkies ]
+  * Don't limit cpu-limited queues to at most 10
+
+  [ Stephen Kitt ]
+  * apt-cache: only show solutions if displayed
+
+  [ Brian Murray ]
+  * Do not include squashfs file systems in df output. (LP: #1756595)
+
+  [ Simon Körner ]
+  * http: Fix Host header in proxied https connections
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 17 Jun 2019 11:36:56 +0200
+
 apt (1.8.4+parrot1+lts1) lts-updates; urgency=medium
 
   * Import new Parrot Rolling release.
