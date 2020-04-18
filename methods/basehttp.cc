@@ -372,6 +372,9 @@ BaseHttpMethod::DealWithHeaders(FetchResult &Res, RequestState &Req)
 	 // as well as http to https
 	 else if ((Uri.Access == "http" || Uri.Access == "https+http") && tmpURI.Access == "https")
 	    return TRY_AGAIN_OR_REDIRECT;
+	 	 // allow https to http redirects (for https mirrordirectors with http mirrors)
+	 else if ((Uri.Access == "https" || Uri.Access == "https+http") && tmpURI.Access == "http")
+	 	return TRY_AGAIN_OR_REDIRECT;
 	 else
 	 {
 	    auto const tmpplus = tmpURI.Access.find('+');
