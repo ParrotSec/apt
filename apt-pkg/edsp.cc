@@ -29,8 +29,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <limits>
+#include <sstream>
 #include <string>
 
 #include <apti18n.h>
@@ -119,19 +121,25 @@ static bool WriteScenarioDependency(FileFd &output, pkgCache::VerIterator const 
    for (size_t i = 1; i < dependencies.size(); ++i)
       if (dependencies[i].empty() == false)
 	 WriteOkay(Okay, output, "\n", DepMap[i], ": ", dependencies[i]);
-   string provides;
-   for (pkgCache::PrvIterator Prv = Ver.ProvidesList(); Prv.end() == false; ++Prv)
+   std::vector<std::string> provides;
+   for (auto Prv = Ver.ProvidesList(); not Prv.end(); ++Prv)
    {
-      if (Prv.IsMultiArchImplicit() == true)
+      if (Prv.IsMultiArchImplicit())
 	 continue;
-      if (provides.empty() == false)
-	 provides.append(", ");
-      provides.append(Prv.Name());
+      std::string provide = Prv.Name();
       if (Prv->ProvideVersion != 0)
-	 provides.append(" (= ").append(Prv.ProvideVersion()).append(")");
+	 provide.append(" (= ").append(Prv.ProvideVersion()).append(")");
+      if ((Ver->MultiArch & pkgCache::Version::Foreign) != 0 && std::find(provides.cbegin(), provides.cend(), provide) != provides.cend())
+	 continue;
+      provides.emplace_back(std::move(provide));
    }
-   if (provides.empty() == false)
-      WriteOkay(Okay, output, "\nProvides: ", provides);
+   if (not provides.empty())
+   {
+      std::ostringstream out;
+      std::copy(provides.begin(), provides.end() - 1, std::ostream_iterator<std::string>(out, ", "));
+      out << provides.back();
+      WriteOkay(Okay, output, "\nProvides: ", out.str());
+   }
    return WriteOkay(Okay, output, "\n");
 }
 									/*}}}*/
@@ -262,7 +270,7 @@ bool EDSP::WriteScenario(pkgDepCache &Cache, FileFd &output, OpProgress *Progres
    for (pkgCache::PkgIterator Pkg = Cache.PkgBegin(); Pkg.end() == false && likely(Okay); ++Pkg)
    {
       std::string const arch = Pkg.Arch();
-      if (std::find(archs.begin(), archs.end(), arch) == archs.end())
+      if (Pkg->CurrentVer == 0 && std::find(archs.begin(), archs.end(), arch) == archs.end())
 	 continue;
       for (pkgCache::VerIterator Ver = Pkg.VersionList(); Ver.end() == false && likely(Okay); ++Ver, ++p)
       {
@@ -335,9 +343,8 @@ bool EDSP::WriteRequest(pkgDepCache &Cache, FileFd &output,
    }
    bool Okay = WriteOkay(output, "Request: EDSP 0.5\n");
 
-   const char *arch = _config->Find("APT::Architecture").c_str();
    std::vector<string> archs = APT::Configuration::getArchitectures();
-   WriteOkay(Okay, output, "Architecture: ", arch, "\n",
+   WriteOkay(Okay, output, "Architecture: ", _config->Find("APT::Architecture").c_str(), "\n",
 	 "Architectures:");
    for (std::vector<string>::const_iterator a = archs.begin(); a != archs.end(); ++a)
        WriteOkay(Okay, output, " ", *a);
@@ -858,9 +865,8 @@ bool EIPP::WriteRequest(pkgDepCache &Cache, FileFd &output,		/*{{{*/
    }
    bool Okay = WriteOkay(output, "Request: EIPP 0.1\n");
 
-   const char *arch = _config->Find("APT::Architecture").c_str();
    std::vector<string> archs = APT::Configuration::getArchitectures();
-   WriteOkay(Okay, output, "Architecture: ", arch, "\n",
+   WriteOkay(Okay, output, "Architecture: ", _config->Find("APT::Architecture").c_str(), "\n",
 	 "Architectures:");
    for (std::vector<string>::const_iterator a = archs.begin(); a != archs.end(); ++a)
        WriteOkay(Okay, output, " ", *a);

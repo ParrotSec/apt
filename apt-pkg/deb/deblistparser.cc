@@ -318,6 +318,8 @@ bool debListParser::UsePackage(pkgCache::PkgIterator &Pkg,
 	 return false;
    if (Section.FindFlag(pkgTagSection::Key::Important,Pkg->Flags,pkgCache::Flag::Important) == false)
       return false;
+   if (Section.FindFlag(pkgTagSection::Key::Protected, Pkg->Flags, pkgCache::Flag::Important) == false)
+      return false;
 
    if (std::find(forceEssential.begin(), forceEssential.end(), Pkg.Name()) != forceEssential.end())
    {
@@ -1018,12 +1020,11 @@ debDebFileParser::debDebFileParser(FileFd *File, std::string const &DebFile)
 bool debDebFileParser::UsePackage(pkgCache::PkgIterator &Pkg,
                                   pkgCache::VerIterator &Ver)
 {
-   bool res = debListParser::UsePackage(Pkg, Ver);
-   // we use the full file path as a provides so that the file is found
-   // by its name
-   if(NewProvides(Ver, DebFile, Pkg.Cache()->NativeArch(), Ver.VerStr(), 0) == false)
+   if (not debListParser::UsePackage(Pkg, Ver))
       return false;
-   return res;
+   // we use the full file path as a provides so that the file is found by its name
+   // using the MultiArchImplicit flag for this is a bit of a stretch
+   return NewProvides(Ver, DebFile, Pkg.Cache()->NativeArch(), Ver.VerStr(), pkgCache::Flag::MultiArchImplicit | pkgCache::Flag::ArchSpecific);
 }
 
 debListParser::~debListParser() {}

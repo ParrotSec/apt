@@ -118,6 +118,88 @@ pkgDepCache::~pkgDepCache()
    delete delLocalPolicy;
 }
 									/*}}}*/
+bool pkgDepCache::CheckConsistency(char const *const msgtag)		/*{{{*/
+{
+   auto const OrigPkgState = PkgState;
+   auto const OrigDepState = DepState;
+
+   PkgState = new StateCache[Head().PackageCount];
+   DepState = new unsigned char[Head().DependsCount];
+   memset(PkgState,0,sizeof(*PkgState)*Head().PackageCount);
+   memset(DepState,0,sizeof(*DepState)*Head().DependsCount);
+
+   auto const origUsrSize = iUsrSize;
+   auto const origDownloadSize = iDownloadSize;
+   auto const origInstCount = iInstCount;
+   auto const origDelCount = iDelCount;
+   auto const origKeepCount = iKeepCount;
+   auto const origBrokenCount = iBrokenCount;
+   auto const origPolicyBrokenCount = iPolicyBrokenCount;
+   auto const origBadCount = iBadCount;
+
+   for (PkgIterator I = PkgBegin(); not I.end(); ++I)
+   {
+      auto &State = PkgState[I->ID];
+      auto const &OrigState = OrigPkgState[I->ID];
+      State.iFlags = OrigState.iFlags;
+
+      State.CandidateVer = OrigState.CandidateVer;
+      State.InstallVer = OrigState.InstallVer;
+      State.Mode = OrigState.Mode;
+      State.Update(I,*this);
+      State.Status = OrigState.Status;
+   }
+   PerformDependencyPass(nullptr);
+
+   _error->PushToStack();
+#define APT_CONSISTENCY_CHECK(VAR,STR) \
+   if (orig##VAR != i##VAR) \
+      _error->Warning("Internal Inconsistency in pkgDepCache: " #VAR " " STR " vs " STR " (%s)", i##VAR, orig##VAR, msgtag)
+   APT_CONSISTENCY_CHECK(UsrSize, "%lld");
+   APT_CONSISTENCY_CHECK(DownloadSize, "%lld");
+   APT_CONSISTENCY_CHECK(InstCount, "%lu");
+   APT_CONSISTENCY_CHECK(DelCount, "%lu");
+   APT_CONSISTENCY_CHECK(KeepCount, "%lu");
+   APT_CONSISTENCY_CHECK(BrokenCount, "%lu");
+   APT_CONSISTENCY_CHECK(PolicyBrokenCount, "%lu");
+   APT_CONSISTENCY_CHECK(BadCount, "%lu");
+#undef APT_CONSISTENCY_CHECK
+
+   for (PkgIterator P = PkgBegin(); not P.end(); ++P)
+   {
+      auto const &State = PkgState[P->ID];
+      auto const &OrigState = OrigPkgState[P->ID];
+      if (State.Status != OrigState.Status)
+	 _error->Warning("Internal Inconsistency in pkgDepCache: Status of %s is %d vs %d (%s)", P.FullName().c_str(), State.Status, OrigState.Status, msgtag);
+      if (State.NowBroken() != OrigState.NowBroken())
+	 _error->Warning("Internal Inconsistency in pkgDepCache: Now broken for %s is %d vs %d (%s)", P.FullName().c_str(), static_cast<int>(State.DepState), static_cast<int>(OrigState.DepState), msgtag);
+      if (State.NowPolicyBroken() != OrigState.NowPolicyBroken())
+	 _error->Warning("Internal Inconsistency in pkgDepCache: Now policy broken for %s is %d vs %d (%s)", P.FullName().c_str(), static_cast<int>(State.DepState), static_cast<int>(OrigState.DepState), msgtag);
+      if (State.InstBroken() != OrigState.InstBroken())
+	 _error->Warning("Internal Inconsistency in pkgDepCache: Install broken for %s is %d vs %d (%s)", P.FullName().c_str(), static_cast<int>(State.DepState), static_cast<int>(OrigState.DepState), msgtag);
+      if (State.InstPolicyBroken() != OrigState.InstPolicyBroken())
+	 _error->Warning("Internal Inconsistency in pkgDepCache: Install broken for %s is %d vs %d (%s)", P.FullName().c_str(), static_cast<int>(State.DepState), static_cast<int>(OrigState.DepState), msgtag);
+   }
+
+   auto inconsistent = _error->PendingError();
+   _error->MergeWithStack();
+
+   delete[] PkgState;
+   delete[] DepState;
+   PkgState = OrigPkgState;
+   DepState = OrigDepState;
+   iUsrSize = origUsrSize;
+   iDownloadSize = origDownloadSize;
+   iInstCount = origInstCount;
+   iDelCount = origDelCount;
+   iKeepCount = origKeepCount;
+   iBrokenCount = origBrokenCount;
+   iPolicyBrokenCount = origPolicyBrokenCount;
+   iBadCount = origBadCount;
+
+   return not inconsistent;
+}
+									/*}}}*/
 // DepCache::Init - Generate the initial extra structures.		/*{{{*/
 // ---------------------------------------------------------------------
 /* This allocats the extension buffers and initializes them. */
@@ -655,8 +737,8 @@ void pkgDepCache::UpdateVerState(PkgIterator const &Pkg)
 // ---------------------------------------------------------------------
 /* This will figure out the state of all the packages and all the 
    dependencies based on the current policy. */
-void pkgDepCache::Update(OpProgress * const Prog)
-{   
+void pkgDepCache::PerformDependencyPass(OpProgress * const Prog)
+{
    iUsrSize = 0;
    iDownloadSize = 0;
    iInstCount = 0;
@@ -666,7 +748,6 @@ void pkgDepCache::Update(OpProgress * const Prog)
    iPolicyBrokenCount = 0;
    iBadCount = 0;
 
-   // Perform the depends pass
    int Done = 0;
    for (PkgIterator I = PkgBegin(); I.end() != true; ++I, ++Done)
    {
@@ -699,10 +780,12 @@ void pkgDepCache::Update(OpProgress * const Prog)
       UpdateVerState(I);
       AddStates(I);
    }
-
    if (Prog != 0)
       Prog->Progress(Done);
-
+}
+void pkgDepCache::Update(OpProgress * const Prog)
+{
+   PerformDependencyPass(Prog);
    readStateFile(Prog);
 }
 									/*}}}*/
@@ -744,16 +827,76 @@ void pkgDepCache::Update(PkgIterator const &Pkg)
    Update(Pkg.RevDependsList());
 
    // Update the provides map for the current ver
-   if (Pkg->CurrentVer != 0)
-      for (PrvIterator P = Pkg.CurrentVer().ProvidesList(); 
-	   P.end() != true; ++P)
+   auto const CurVer = Pkg.CurrentVer();
+   if (not CurVer.end())
+      for (PrvIterator P = CurVer.ProvidesList(); not P.end(); ++P)
 	 Update(P.ParentPkg().RevDependsList());
 
    // Update the provides map for the candidate ver
-   if (PkgState[Pkg->ID].CandidateVer != 0)
-      for (PrvIterator P = PkgState[Pkg->ID].CandidateVerIter(*this).ProvidesList();
-	   P.end() != true; ++P)
+   auto const CandVer = PkgState[Pkg->ID].CandidateVerIter(*this);
+   if (not CandVer.end() && CandVer != CurVer)
+      for (PrvIterator P = CandVer.ProvidesList(); not P.end(); ++P)
 	 Update(P.ParentPkg().RevDependsList());
+}
+									/*}}}*/
+// DepCache::IsModeChangeOk - check if it is ok to change the mode	/*{{{*/
+// ---------------------------------------------------------------------
+/* this is used by all Mark methods on the very first line to check sanity
+   and prevents mode changes for packages on hold for example.
+   If you want to check Mode specific stuff you can use the virtual public
+   Is<Mode>Ok methods instead */
+static char const* PrintMode(char const mode)
+{
+	 switch (mode)
+	 {
+	 case pkgDepCache::ModeInstall: return "Install";
+	 case pkgDepCache::ModeKeep: return "Keep";
+	 case pkgDepCache::ModeDelete: return "Delete";
+	 case pkgDepCache::ModeGarbage: return "Garbage";
+	 default: return "UNKNOWN";
+	 }
+}
+static bool IsModeChangeOk(pkgDepCache &Cache, pkgDepCache::ModeList const mode, pkgCache::PkgIterator const &Pkg,
+			   unsigned long const Depth, bool const FromUser, bool const DebugMarker)
+{
+   // we are not trying to hard…
+   if (unlikely(Depth > 100))
+      return false;
+
+   // general sanity
+   if (unlikely(Pkg.end() == true || Pkg->VersionList == 0))
+      return false;
+
+   // the user is always right
+   if (FromUser == true)
+      return true;
+
+   auto &P = Cache[Pkg];
+   // not changing the mode is obviously also fine as we might want to call
+   // e.g. MarkInstall multiple times with different arguments for the same package
+   if (P.Mode == mode)
+      return true;
+
+   // if previous state was set by user only user can reset it
+   if ((P.iFlags & pkgDepCache::Protected) == pkgDepCache::Protected)
+   {
+      if (unlikely(DebugMarker == true))
+	 std::clog << OutputInDepth(Depth) << "Ignore Mark" << PrintMode(mode)
+		   << " of " << APT::PrettyPkg(&Cache, Pkg) << " as its mode (" << PrintMode(P.Mode)
+		   << ") is protected" << std::endl;
+      return false;
+   }
+   // enforce dpkg holds
+   else if (mode != pkgDepCache::ModeKeep && Pkg->SelectedState == pkgCache::State::Hold &&
+	    _config->FindB("APT::Ignore-Hold",false) == false)
+   {
+      if (unlikely(DebugMarker == true))
+	 std::clog << OutputInDepth(Depth) << "Hold prevents Mark" << PrintMode(mode)
+		   << " of " << APT::PrettyPkg(&Cache, Pkg) << std::endl;
+      return false;
+   }
+
+   return true;
 }
 									/*}}}*/
 // DepCache::MarkKeep - Put the package in the keep state		/*{{{*/
@@ -762,7 +905,7 @@ void pkgDepCache::Update(PkgIterator const &Pkg)
 bool pkgDepCache::MarkKeep(PkgIterator const &Pkg, bool Soft, bool FromUser,
                            unsigned long Depth)
 {
-   if (IsModeChangeOk(ModeKeep, Pkg, Depth, FromUser) == false)
+   if (not IsModeChangeOk(*this, ModeKeep, Pkg, Depth, FromUser, DebugMarker))
       return false;
 
    /* Reject an attempt to keep a non-source broken installed package, those
@@ -822,7 +965,7 @@ bool pkgDepCache::MarkKeep(PkgIterator const &Pkg, bool Soft, bool FromUser,
 bool pkgDepCache::MarkDelete(PkgIterator const &Pkg, bool rPurge,
                              unsigned long Depth, bool FromUser)
 {
-   if (IsModeChangeOk(ModeDelete, Pkg, Depth, FromUser) == false)
+   if (not IsModeChangeOk(*this, ModeDelete, Pkg, Depth, FromUser, DebugMarker))
       return false;
 
    StateCache &P = PkgState[Pkg->ID];
@@ -921,75 +1064,18 @@ bool pkgDepCache::IsDeleteOkProtectInstallRequests(PkgIterator const &Pkg,
    return true;
 }
 									/*}}}*/
-// DepCache::IsModeChangeOk - check if it is ok to change the mode	/*{{{*/
-// ---------------------------------------------------------------------
-/* this is used by all Mark methods on the very first line to check sanity
-   and prevents mode changes for packages on hold for example.
-   If you want to check Mode specific stuff you can use the virtual public
-   Is<Mode>Ok methods instead */
-static char const* PrintMode(char const mode)
-{
-	 switch (mode)
-	 {
-	 case pkgDepCache::ModeInstall: return "Install";
-	 case pkgDepCache::ModeKeep: return "Keep";
-	 case pkgDepCache::ModeDelete: return "Delete";
-	 case pkgDepCache::ModeGarbage: return "Garbage";
-	 default: return "UNKNOWN";
-	 }
-}
-bool pkgDepCache::IsModeChangeOk(ModeList const mode, PkgIterator const &Pkg,
-				 unsigned long const Depth, bool const FromUser)
-{
-   // we are not trying to hard…
-   if (unlikely(Depth > 100))
-      return false;
-
-   // general sanity
-   if (unlikely(Pkg.end() == true || Pkg->VersionList == 0))
-      return false;
-
-   // the user is always right
-   if (FromUser == true)
-      return true;
-
-   StateCache &P = PkgState[Pkg->ID];
-   // not changing the mode is obviously also fine as we might want to call
-   // e.g. MarkInstall multiple times with different arguments for the same package
-   if (P.Mode == mode)
-      return true;
-
-   // if previous state was set by user only user can reset it
-   if ((P.iFlags & Protected) == Protected)
-   {
-      if (unlikely(DebugMarker == true))
-	 std::clog << OutputInDepth(Depth) << "Ignore Mark" << PrintMode(mode)
-		   << " of " << APT::PrettyPkg(this, Pkg) << " as its mode (" << PrintMode(P.Mode)
-		   << ") is protected" << std::endl;
-      return false;
-   }
-   // enforce dpkg holds
-   else if (mode != ModeKeep && Pkg->SelectedState == pkgCache::State::Hold &&
-	    _config->FindB("APT::Ignore-Hold",false) == false)
-   {
-      if (unlikely(DebugMarker == true))
-	 std::clog << OutputInDepth(Depth) << "Hold prevents Mark" << PrintMode(mode)
-		   << " of " << APT::PrettyPkg(this, Pkg) << std::endl;
-      return false;
-   }
-
-   return true;
-}
-									/*}}}*/
 struct CompareProviders							/*{{{*/
 {
+   pkgDepCache const &Cache;
    pkgCache::PkgIterator const Pkg;
-   explicit CompareProviders(pkgCache::DepIterator const &Dep) : Pkg(Dep.TargetPkg()) {};
-   //bool operator() (APT::VersionList::iterator const &AV, APT::VersionList::iterator const &BV)
+   explicit CompareProviders(pkgDepCache const &pCache, pkgCache::DepIterator const &Dep) : Cache{pCache}, Pkg{Dep.TargetPkg()} {}
    bool operator() (pkgCache::VerIterator const &AV, pkgCache::VerIterator const &BV)
    {
       pkgCache::PkgIterator const A = AV.ParentPkg();
       pkgCache::PkgIterator const B = BV.ParentPkg();
+      // Deal with protected first as if they don't work we usually have a problem
+      if (Cache[A].Protect() != Cache[B].Protect())
+	 return Cache[A].Protect();
       // Prefer MA:same packages if other architectures for it are installed
       if ((AV->MultiArch & pkgCache::Version::Same) == pkgCache::Version::Same ||
 	  (BV->MultiArch & pkgCache::Version::Same) == pkgCache::Version::Same)
@@ -1068,10 +1154,13 @@ struct CompareProviders							/*{{{*/
    }
 };
 									/*}}}*/
-bool pkgDepCache::MarkInstall_StateChange(PkgIterator const &Pkg, bool AutoInst, bool FromUser) /*{{{*/
+bool pkgDepCache::MarkInstall_StateChange(pkgCache::PkgIterator const &Pkg, bool AutoInst, bool FromUser) /*{{{*/
 {
-   StateCache &P = PkgState[Pkg->ID];
-   P.iFlags &= ~AutoKept;
+   auto &P = (*this)[Pkg];
+   if (P.Protect() && P.InstallVer == P.CandidateVer)
+      return true;
+
+   P.iFlags &= ~pkgDepCache::AutoKept;
 
    /* Target the candidate version and remove the autoflag. We reset the
       autoflag below if this was called recursively. Otherwise the user
@@ -1079,7 +1168,7 @@ bool pkgDepCache::MarkInstall_StateChange(PkgIterator const &Pkg, bool AutoInst,
    RemoveSizes(Pkg);
    RemoveStates(Pkg);
 
-   P.Mode = ModeInstall;
+   P.Mode = pkgDepCache::ModeInstall;
    P.InstallVer = P.CandidateVer;
 
    if(FromUser)
@@ -1088,16 +1177,16 @@ bool pkgDepCache::MarkInstall_StateChange(PkgIterator const &Pkg, bool AutoInst,
        // but only if its not marked by the autoremover (aptitude depend on this behavior)
        // or if we do automatic installation (aptitude never does it)
        if(P.Status == 2 || (Pkg->CurrentVer != 0 && (AutoInst == true || P.Marked == false)))
-	 P.Flags &= ~Flag::Auto;
+	 P.Flags &= ~pkgCache::Flag::Auto;
      }
    else
      {
        // Set it to auto if this is a new install.
        if(P.Status == 2)
-	 P.Flags |= Flag::Auto;
+	 P.Flags |= pkgCache::Flag::Auto;
      }
-   if (P.CandidateVer == (Version *)Pkg.CurrentVer())
-      P.Mode = ModeKeep;
+   if (P.CandidateVer == (pkgCache::Version *)Pkg.CurrentVer())
+      P.Mode = pkgDepCache::ModeKeep;
 
    AddStates(Pkg);
    Update(Pkg);
@@ -1105,8 +1194,37 @@ bool pkgDepCache::MarkInstall_StateChange(PkgIterator const &Pkg, bool AutoInst,
    return true;
 }
 									/*}}}*/
-bool pkgDepCache::MarkInstall_CollectDependencies(pkgCache::VerIterator const &PV, std::vector<pkgCache::DepIterator> &toInstall, std::vector<pkgCache::DepIterator> &toRemove) /*{{{*/
+static bool MarkInstall_DiscardCandidate(pkgDepCache &Cache, pkgCache::PkgIterator const &Pkg) /*{{{*/
 {
+   auto &State = Cache[Pkg];
+   State.CandidateVer = State.InstallVer;
+   auto const oldStatus = State.Status;
+   State.Update(Pkg, Cache);
+   State.Status = oldStatus;
+   return true;
+}
+									/*}}}*/
+bool pkgDepCache::MarkInstall_DiscardInstall(pkgCache::PkgIterator const &Pkg) /*{{{*/
+{
+   StateCache &State = PkgState[Pkg->ID];
+   if (State.Mode == ModeKeep && State.InstallVer == State.CandidateVer && State.CandidateVer == Pkg.CurrentVer())
+      return true;
+   RemoveSizes(Pkg);
+   RemoveStates(Pkg);
+   if (Pkg->CurrentVer != 0)
+      State.InstallVer = Pkg.CurrentVer();
+   else
+      State.InstallVer = nullptr;
+   State.Mode = ModeKeep;
+   AddStates(Pkg);
+   Update(Pkg);
+   AddSizes(Pkg);
+   return MarkInstall_DiscardCandidate(*this, Pkg);
+}
+									/*}}}*/
+static bool MarkInstall_CollectDependencies(pkgDepCache const &Cache, pkgCache::VerIterator const &PV, std::vector<pkgCache::DepIterator> &toInstall, std::vector<pkgCache::DepIterator> &toRemove) /*{{{*/
+{
+   auto const propagateProctected = Cache[PV.ParentPkg()].Protect();
    for (auto Dep = PV.DependsList(); not Dep.end();)
    {
       auto const Start = Dep;
@@ -1114,17 +1232,17 @@ bool pkgDepCache::MarkInstall_CollectDependencies(pkgCache::VerIterator const &P
       bool foundSolution = false;
       for (bool LastOR = true; not Dep.end() && LastOR; ++Dep)
       {
-	 LastOR = (Dep->CompareOp & Dep::Or) == Dep::Or;
-	 if ((DepState[Dep->ID] & DepInstall) == DepInstall)
+	 LastOR = (Dep->CompareOp & pkgCache::Dep::Or) == pkgCache::Dep::Or;
+	 if ((Cache[Dep] & pkgDepCache::DepInstall) == pkgDepCache::DepInstall)
 	    foundSolution = true;
       }
-      if (foundSolution)
+      if (foundSolution && not propagateProctected)
 	 continue;
 
       /* Check if this dep should be consider for install.
          (Pre-)Depends, Conflicts and Breaks for sure.
          Recommends & Suggests depending on configuration */
-      if (not IsImportantDep(Start))
+      if (not Cache.IsImportantDep(Start))
 	 continue;
 
       if (Start.IsNegative())
@@ -1138,74 +1256,190 @@ bool pkgDepCache::MarkInstall_CollectDependencies(pkgCache::VerIterator const &P
    return true;
 }
 									/*}}}*/
-bool pkgDepCache::MarkInstall_RemoveConflictsIfNotUpgradeable(pkgCache::VerIterator const &PV, unsigned long Depth, std::vector<pkgCache::DepIterator> &toRemove, APT::PackageVector &toUpgrade) /*{{{*/
+static APT::VersionVector getAllPossibleSolutions(pkgDepCache &Cache, pkgCache::DepIterator Start, pkgCache::DepIterator const &End, APT::CacheSetHelper::VerSelector const selector, bool const sorted) /*{{{*/
 {
-   /* Negative dependencies have no or-group
-      If the dependency isn't versioned, we try if an upgrade might solve the problem.
-      Otherwise we remove the offender if needed */
-   for (auto const &D : toRemove)
+   pkgCacheFile CacheFile{&Cache};
+   APT::VersionVector toUpgrade, toNewInstall;
+   do
    {
-      std::unique_ptr<Version *[]> List(D.AllTargets());
-      pkgCache::PkgIterator TrgPkg = D.TargetPkg();
-      for (Version **I = List.get(); *I != 0; I++)
+      APT::VersionVector verlist = APT::VersionVector::FromDependency(CacheFile, Start, selector);
+      if (not sorted)
       {
-	 VerIterator Ver(*this, *I);
-	 PkgIterator Pkg = Ver.ParentPkg();
-
-	 /* The List includes all packages providing this dependency,
-	    even providers which are not installed, so skip them. */
-	 if (PkgState[Pkg->ID].InstallVer == 0)
-	    continue;
-
-	 // Ignore negative dependencies on versions that are not going to get installed
-	 if (PkgState[Pkg->ID].InstallVer != *I)
-	    continue;
-
-	 if ((D->Version != 0 || TrgPkg != Pkg) &&
-	     PkgState[Pkg->ID].CandidateVer != PkgState[Pkg->ID].InstallVer &&
-	     PkgState[Pkg->ID].CandidateVer != *I)
-	    toUpgrade.push_back(Pkg);
-	 else
-	 {
-	    if(DebugAutoInstall == true)
-	       std::clog << OutputInDepth(Depth) << " Removing: " << Pkg.Name() << " as upgrade is not an option for " << PV.ParentPkg().FullName() << "(" << PV.VerStr() << ")\n";
-	    if (not MarkDelete(Pkg, false, Depth + 1, false))
-	       return false;
-	    if (PkgState[PV.ParentPkg()->ID].Protect())
-	       MarkProtected(Pkg);
-	 }
+	 std::move(verlist.begin(), verlist.end(), std::back_inserter(toUpgrade));
+	 continue;
       }
+      std::sort(verlist.begin(), verlist.end(), CompareProviders{Cache, Start});
+      for (auto &&Ver : verlist)
+      {
+	 auto P = Ver.ParentPkg();
+	 if (P->CurrentVer != 0)
+	    toUpgrade.emplace_back(std::move(Ver));
+	 else
+	    toNewInstall.emplace_back(std::move(Ver));
+      }
+   } while (Start++ != End);
+   if (toUpgrade.empty())
+      toUpgrade = std::move(toNewInstall);
+   else
+      std::move(toNewInstall.begin(), toNewInstall.end(), std::back_inserter(toUpgrade));
+
+   if (not sorted)
+      std::sort(toUpgrade.begin(), toUpgrade.end(), [](pkgCache::VerIterator const &A, pkgCache::VerIterator const &B) { return A->ID < B->ID; });
+   toUpgrade.erase(std::unique(toUpgrade.begin(), toUpgrade.end()), toUpgrade.end());
+
+   if (not End.IsNegative())
+      toUpgrade.erase(std::remove_if(toUpgrade.begin(), toUpgrade.end(), [&Cache](pkgCache::VerIterator const &V) {
+			 auto const P = V.ParentPkg();
+			 auto const &State = Cache[P];
+			 return State.Protect() && (State.Delete() || (State.Keep() && P->CurrentVer == 0));
+		      }),
+		      toUpgrade.end());
+
+   return toUpgrade;
+}
+									/*}}}*/
+static bool MarkInstall_MarkDeleteForNotUpgradeable(pkgDepCache &Cache, bool const DebugAutoInstall, pkgCache::VerIterator const &PV, unsigned long const Depth, pkgCache::PkgIterator const &Pkg, bool const propagateProctected, APT::PackageVector &delayedRemove)/*{{{*/
+{
+   auto &State = Cache[Pkg];
+   if (not propagateProctected)
+   {
+      if (State.Delete())
+	 return true;
+      if(DebugAutoInstall)
+	 std::clog << OutputInDepth(Depth) << " Delayed Removing: " << Pkg.FullName() << " as upgrade is not an option for " << PV.ParentPkg().FullName() << " (" << PV.VerStr() << ")\n";
+      if (not IsModeChangeOk(Cache, pkgDepCache::ModeDelete, Pkg, Depth, false, DebugAutoInstall) ||
+	  not Cache.IsDeleteOk(Pkg, false, Depth, false))
+	 return false;
+      delayedRemove.push_back(Pkg);
+      return true;
    }
-   toRemove.clear();
+
+   if (not State.Delete())
+   {
+      if(DebugAutoInstall)
+	 std::clog << OutputInDepth(Depth) << " Removing: " << Pkg.FullName() << " as upgrade is not an option for " << PV.ParentPkg().FullName() << " (" << PV.VerStr() << ")\n";
+      if (not Cache.MarkDelete(Pkg, false, Depth + 1, false))
+	 return false;
+   }
+   MarkInstall_DiscardCandidate(Cache, Pkg);
+   Cache.MarkProtected(Pkg);
    return true;
 }
 									/*}}}*/
-bool pkgDepCache::MarkInstall_UpgradeOrRemoveConflicts(bool const propagateProctected, unsigned long Depth, bool const ForceImportantDeps, APT::PackageVector &toUpgrade) /*{{{*/
+static bool MarkInstall_RemoveConflictsIfNotUpgradeable(pkgDepCache &Cache, bool const DebugAutoInstall, pkgCache::VerIterator const &PV, unsigned long Depth, std::vector<pkgCache::DepIterator> &toRemove, APT::PackageVector &toUpgrade, APT::PackageVector &delayedRemove, bool const propagateProctected, bool const FromUser) /*{{{*/
 {
+   /* Negative dependencies have no or-group
+      If the candidate is effected try to keep current and discard candidate
+      If the current is effected try upgrading to candidate or remove it */
+   bool failedToRemoveSomething = false;
+   APT::PackageVector badCandidate;
+   for (auto const &D : toRemove)
+   {
+      for (auto const &Ver : getAllPossibleSolutions(Cache, D, D, APT::CacheSetHelper::CANDIDATE, true))
+      {
+	 auto const Pkg = Ver.ParentPkg();
+	 auto &State = Cache[Pkg];
+	 if (State.CandidateVer != Ver)
+	    continue;
+	 if (Pkg.CurrentVer() != Ver)
+	 {
+	    if (State.Install() && not Cache.MarkKeep(Pkg, false, false, Depth))
+	    {
+	       failedToRemoveSomething = true;
+	       if (not propagateProctected && not FromUser)
+		  break;
+	    }
+	    else if (propagateProctected)
+	    {
+	       MarkInstall_DiscardCandidate(Cache, Pkg);
+	       if (Pkg->CurrentVer == 0)
+		  Cache.MarkProtected(Pkg);
+	    }
+	    else
+	       badCandidate.push_back(Pkg);
+	 }
+	 else if (not MarkInstall_MarkDeleteForNotUpgradeable(Cache, DebugAutoInstall, PV, Depth, Pkg, propagateProctected, delayedRemove))
+	 {
+	    failedToRemoveSomething = true;
+	    if (not propagateProctected && not FromUser)
+	       break;
+	 }
+      }
+      if (failedToRemoveSomething && not propagateProctected && not FromUser)
+	 break;
+      for (auto const &Ver : getAllPossibleSolutions(Cache, D, D, APT::CacheSetHelper::INSTALLED, true))
+      {
+	 auto const Pkg = Ver.ParentPkg();
+	 auto &State = Cache[Pkg];
+	 if (State.CandidateVer != Ver && State.CandidateVer != nullptr &&
+	     std::find(badCandidate.cbegin(), badCandidate.cend(), Pkg) == badCandidate.end())
+	    toUpgrade.push_back(Pkg);
+	 else if (State.CandidateVer == Pkg.CurrentVer())
+	    ; // already done in the first loop above
+	 else if (not MarkInstall_MarkDeleteForNotUpgradeable(Cache, DebugAutoInstall, PV, Depth, Pkg, propagateProctected, delayedRemove))
+	 {
+	    failedToRemoveSomething = true;
+	    if (not propagateProctected && not FromUser)
+	       break;
+	 }
+      }
+      if (failedToRemoveSomething && not propagateProctected && not FromUser)
+	 break;
+   }
+   toRemove.clear();
+   return not failedToRemoveSomething;
+}
+									/*}}}*/
+static bool MarkInstall_UpgradeOrRemoveConflicts(pkgDepCache &Cache, bool const DebugAutoInstall, unsigned long Depth, bool const ForceImportantDeps, APT::PackageVector &toUpgrade, bool const propagateProctected, bool const FromUser) /*{{{*/
+{
+   bool failedToRemoveSomething = false;
    for (auto const &InstPkg : toUpgrade)
-      if (not MarkInstall(InstPkg, true, Depth + 1, false, ForceImportantDeps))
+      if (not Cache[InstPkg].Install() && not Cache.MarkInstall(InstPkg, true, Depth + 1, false, ForceImportantDeps))
       {
 	 if (DebugAutoInstall)
 	    std::clog << OutputInDepth(Depth) << " Removing: " << InstPkg.FullName() << " as upgrade is not possible\n";
-	 if (not MarkDelete(InstPkg, false, Depth + 1, false))
-	    return false;
-	 if (propagateProctected)
-	    MarkProtected(InstPkg);
+	 if (not Cache.MarkDelete(InstPkg, false, Depth + 1, false))
+	 {
+	    failedToRemoveSomething = true;
+	    if (not propagateProctected && not FromUser)
+	       break;
+	 }
+	 else if (propagateProctected)
+	    Cache.MarkProtected(InstPkg);
       }
    toUpgrade.clear();
-   return true;
+   return not failedToRemoveSomething;
 }
 									/*}}}*/
-bool pkgDepCache::MarkInstall_InstallDependencies(PkgIterator const &Pkg, unsigned long Depth, bool const ForceImportantDeps, std::vector<pkgCache::DepIterator> &toInstall, APT::PackageVector *const toMoveAuto, bool const propagateProctected, bool const FromUser) /*{{{*/
+static bool MarkInstall_InstallDependencies(pkgDepCache &Cache, bool const DebugAutoInstall, bool const DebugMarker, pkgCache::PkgIterator const &Pkg, unsigned long Depth, bool const ForceImportantDeps, std::vector<pkgCache::DepIterator> &toInstall, APT::PackageVector *const toMoveAuto, bool const propagateProctected, bool const FromUser) /*{{{*/
 {
-   auto const IsSatisfiedByInstalled = [&](auto const D) { return (DepState[D.ID] & DepInstall) == DepInstall; };
+   auto const IsSatisfiedByInstalled = [&](auto &D) { return (Cache[pkgCache::DepIterator{Cache, &D}] & pkgDepCache::DepInstall) == pkgDepCache::DepInstall; };
+   bool failedToInstallSomething = false;
    for (auto &&Dep : toInstall)
    {
-      pkgDepCache::DepIterator Start, End;
+      auto const Copy = Dep;
+      pkgCache::DepIterator Start, End;
       Dep.GlobOr(Start, End);
-      if (std::any_of(Start, Dep, IsSatisfiedByInstalled))
+      bool foundSolution = std::any_of(Start, Dep, IsSatisfiedByInstalled);
+      if (foundSolution && not propagateProctected)
 	 continue;
       bool const IsCriticalDep = Start.IsCritical();
+      if (foundSolution)
+      {
+	 // try propagating protected to this satisfied dependency
+	 if (not IsCriticalDep)
+	    continue;
+	 auto const possibleSolutions = getAllPossibleSolutions(Cache, Start, End, APT::CacheSetHelper::CANDANDINST, false);
+	 if (possibleSolutions.size() != 1)
+	    continue;
+	 auto const InstPkg = possibleSolutions.begin().ParentPkg();
+	 if (Cache[InstPkg].Protect())
+	    continue;
+	 Cache.MarkProtected(InstPkg);
+	 if (not Cache.MarkInstall(InstPkg, true, Depth + 1, false, ForceImportantDeps))
+	    failedToInstallSomething = true;
+	 continue;
+      }
 
       /* Check if any ImportantDep() (but not Critical) were added
        * since we installed the package.  Also check for deps that
@@ -1218,21 +1452,21 @@ bool pkgDepCache::MarkInstall_InstallDependencies(PkgIterator const &Pkg, unsign
       {
 	 bool isNewImportantDep = true;
 	 bool isPreviouslySatisfiedImportantDep = false;
-	 for (DepIterator D = Pkg.CurrentVer().DependsList(); D.end() != true; ++D)
+	 for (pkgCache::DepIterator D = Pkg.CurrentVer().DependsList(); D.end() != true; ++D)
 	 {
 	    //FIXME: Should we handle or-group better here?
 	    // We do not check if the package we look for is part of the same or-group
 	    // we might find while searching, but could that really be a problem?
-	    if (D.IsCritical() || not IsImportantDep(D) ||
+	    if (D.IsCritical() || not Cache.IsImportantDep(D) ||
 		Start.TargetPkg() != D.TargetPkg())
 	       continue;
 
 	    isNewImportantDep = false;
 
-	    while ((D->CompareOp & Dep::Or) != 0)
+	    while ((D->CompareOp & pkgCache::Dep::Or) != 0)
 	       ++D;
 
-	    isPreviouslySatisfiedImportantDep = (((*this)[D] & DepGNow) != 0);
+	    isPreviouslySatisfiedImportantDep = ((Cache[D] & pkgDepCache::DepGNow) != 0);
 	    if (isPreviouslySatisfiedImportantDep)
 	       break;
 	 }
@@ -1258,41 +1492,22 @@ bool pkgDepCache::MarkInstall_InstallDependencies(PkgIterator const &Pkg, unsign
 	 }
       }
 
-      pkgCacheFile CacheFile{this};
-      APT::PackageVector toUpgrade, toNewInstall;
-      do
+      auto const possibleSolutions = getAllPossibleSolutions(Cache, Start, End, APT::CacheSetHelper::CANDIDATE, true);
+      for (auto const &InstVer : possibleSolutions)
       {
-	 if ((DepState[Start->ID] & DepCVer) != DepCVer)
-	    continue;
-
-	 APT::VersionVector verlist = APT::VersionVector::FromDependency(CacheFile, Start, APT::CacheSetHelper::CANDIDATE);
-	 std::sort(verlist.begin(), verlist.end(), CompareProviders{Start});
-	 for (auto const &Ver : verlist)
-	 {
-	    auto P = Ver.ParentPkg();
-	    if (P->CurrentVer != 0)
-	       toUpgrade.emplace_back(std::move(P));
-	    else
-	       toNewInstall.emplace_back(std::move(P));
-	 }
-      } while (Start++ != End);
-
-      std::move(toNewInstall.begin(), toNewInstall.end(), std::back_inserter(toUpgrade));
-      bool foundSolution = false;
-      for (auto const &InstPkg : toUpgrade)
-      {
-	 if (PkgState[InstPkg->ID].CandidateVer == nullptr || PkgState[InstPkg->ID].CandidateVer == InstPkg.CurrentVer())
+	 auto const InstPkg = InstVer.ParentPkg();
+	 if (Cache[InstPkg].CandidateVer != InstVer)
 	    continue;
 	 if (DebugAutoInstall)
 	    std::clog << OutputInDepth(Depth) << "Installing " << InstPkg.FullName()
 		      << " as " << End.DepType() << " of " << Pkg.FullName() << '\n';
-	 if (propagateProctected && IsCriticalDep && toUpgrade.size() == 1)
+	 if (propagateProctected && IsCriticalDep && possibleSolutions.size() == 1)
 	 {
-	    if (not MarkInstall(InstPkg, false, Depth + 1, false, ForceImportantDeps))
+	    if (not Cache.MarkInstall(InstPkg, false, Depth + 1, false, ForceImportantDeps))
 	       continue;
-	    MarkProtected(InstPkg);
+	    Cache.MarkProtected(InstPkg);
 	 }
-	 if (not MarkInstall(InstPkg, true, Depth + 1, false, ForceImportantDeps))
+	 if (not Cache.MarkInstall(InstPkg, true, Depth + 1, false, ForceImportantDeps))
 	    continue;
 
 	 if (toMoveAuto != nullptr && InstPkg->CurrentVer == 0)
@@ -1301,28 +1516,17 @@ bool pkgDepCache::MarkInstall_InstallDependencies(PkgIterator const &Pkg, unsign
 	 foundSolution = true;
 	 break;
       }
+      if (DebugMarker && not foundSolution)
+	 std::clog << OutputInDepth(Depth+1) << APT::PrettyDep(&Cache, Copy) << " can't be satisfied! (dep)\n";
       if (not foundSolution && IsCriticalDep)
       {
+	 failedToInstallSomething = true;
 	 if (not propagateProctected && not FromUser)
-	 {
-	    StateCache &State = PkgState[Pkg->ID];
-	    RemoveSizes(Pkg);
-	    RemoveStates(Pkg);
-	    if (Pkg->CurrentVer != 0)
-	       State.InstallVer = State.CandidateVer = Pkg.CurrentVer();
-	    else
-	       State.InstallVer = State.CandidateVer = nullptr;
-	    State.Mode = ModeKeep;
-	    State.Update(Pkg, *this);
-	    AddStates(Pkg);
-	    Update(Pkg);
-	    AddSizes(Pkg);
-	 }
-	 return false;
+	    break;
       }
    }
    toInstall.clear();
-   return true;
+   return not failedToInstallSomething;
 }
 									/*}}}*/
 // DepCache::MarkInstall - Put the package in the install state		/*{{{*/
@@ -1330,24 +1534,28 @@ bool pkgDepCache::MarkInstall(PkgIterator const &Pkg, bool AutoInst,
 			      unsigned long Depth, bool FromUser,
 			      bool ForceImportantDeps)
 {
-   if (IsModeChangeOk(ModeInstall, Pkg, Depth, FromUser) == false)
+   StateCache &P = PkgState[Pkg->ID];
+   if (P.Protect() && P.Keep() && P.CandidateVer != nullptr && P.CandidateVer == Pkg.CurrentVer())
+      ; // we are here to mark our dependencies as protected, no state is changed
+   else if (not IsModeChangeOk(*this, ModeInstall, Pkg, Depth, FromUser, DebugMarker))
       return false;
 
-   StateCache &P = PkgState[Pkg->ID];
 
    // See if there is even any possible installation candidate
    if (P.CandidateVer == 0)
       return false;
 
-   /* Check that it is not already marked for install and that it can be 
-      installed */
-   if ((not P.InstPolicyBroken() && not P.InstBroken()) &&
-       (P.Mode == ModeInstall ||
-	P.CandidateVer == (Version *)Pkg.CurrentVer()))
+   // Check that it is not already marked for install and that it can be installed
+   if (not P.Protect() && not P.InstPolicyBroken() && not P.InstBroken())
    {
-      if (P.CandidateVer == (Version *)Pkg.CurrentVer() && P.InstallVer == 0)
-	 return MarkKeep(Pkg, false, FromUser, Depth + 1);
-      return true;
+      if (P.CandidateVer == Pkg.CurrentVer())
+      {
+	 if (P.InstallVer == 0)
+	    return MarkKeep(Pkg, false, FromUser, Depth + 1);
+	 return true;
+      }
+      else if (P.Mode == ModeInstall)
+	 return true;
    }
 
    // check if we are allowed to install the package
@@ -1359,26 +1567,32 @@ bool pkgDepCache::MarkInstall(PkgIterator const &Pkg, bool AutoInst,
       return false;
 
    bool const AutoSolve = AutoInst && _config->Find("APT::Solver", "internal") == "internal";
+   bool const failEarly = not P.Protect() && not FromUser;
+   bool hasFailed = false;
 
    std::vector<pkgCache::DepIterator> toInstall, toRemove;
-   APT::PackageVector toUpgrade;
+   APT::PackageVector toUpgrade, delayedRemove;
    if (AutoSolve)
    {
       VerIterator const PV = P.CandidateVerIter(*this);
       if (unlikely(PV.end()))
 	 return false;
-      if (not MarkInstall_CollectDependencies(PV, toInstall, toRemove))
+      if (not MarkInstall_CollectDependencies(*this, PV, toInstall, toRemove))
 	 return false;
 
-      if (not MarkInstall_RemoveConflictsIfNotUpgradeable(PV, Depth, toRemove, toUpgrade))
-	 return false;
+      if (not MarkInstall_RemoveConflictsIfNotUpgradeable(*this, DebugAutoInstall, PV, Depth, toRemove, toUpgrade, delayedRemove, P.Protect(), FromUser))
+      {
+	 if (failEarly)
+	    return false;
+	 hasFailed = true;
+      }
    }
 
    if (not FromUser && not MarkInstall_StateChange(Pkg, AutoInst, FromUser))
       return false;
 
    if (not AutoSolve)
-      return true;
+      return not hasFailed;
 
    if (DebugMarker)
       std::clog << OutputInDepth(Depth) << "MarkInstall " << APT::PrettyPkg(this, Pkg) << " FU=" << FromUser << '\n';
@@ -1402,8 +1616,15 @@ bool pkgDepCache::MarkInstall(PkgIterator const &Pkg, bool AutoInst,
       operator bool() noexcept { return already; }
    } propagateProctected{PkgState[Pkg->ID]};
 
-   if (not MarkInstall_UpgradeOrRemoveConflicts(propagateProctected, Depth, ForceImportantDeps, toUpgrade))
-      return false;
+   if (not MarkInstall_UpgradeOrRemoveConflicts(*this, DebugAutoInstall, Depth, ForceImportantDeps, toUpgrade, propagateProctected, FromUser))
+   {
+      if (failEarly)
+      {
+	 MarkInstall_DiscardInstall(Pkg);
+	 return false;
+      }
+      hasFailed = true;
+   }
 
    bool const MoveAutoBitToDependencies = [&]() {
       VerIterator const PV = P.InstVerIter(*this);
@@ -1422,8 +1643,29 @@ bool pkgDepCache::MarkInstall(PkgIterator const &Pkg, bool AutoInst,
    }();
 
    APT::PackageVector toMoveAuto;
-   if (not MarkInstall_InstallDependencies(Pkg, Depth, ForceImportantDeps, toInstall, MoveAutoBitToDependencies ? &toMoveAuto : nullptr, propagateProctected, FromUser))
-      return false;
+   if (not MarkInstall_InstallDependencies(*this, DebugAutoInstall, DebugMarker, Pkg, Depth, ForceImportantDeps, toInstall,
+					   MoveAutoBitToDependencies ? &toMoveAuto : nullptr, propagateProctected, FromUser))
+   {
+      if (failEarly)
+      {
+	 MarkInstall_DiscardInstall(Pkg);
+	 return false;
+      }
+      hasFailed = true;
+   }
+
+   for (auto const &R : delayedRemove)
+   {
+      if (not MarkDelete(R, false, Depth, false))
+      {
+	 if (failEarly)
+	 {
+	    MarkInstall_DiscardInstall(Pkg);
+	    return false;
+	 }
+	 hasFailed = true;
+      }
+   }
 
    if (MoveAutoBitToDependencies)
    {
@@ -1438,7 +1680,7 @@ bool pkgDepCache::MarkInstall(PkgIterator const &Pkg, bool AutoInst,
 	 MarkAuto(InstPkg, false);
       }
    }
-   return true;
+   return not hasFailed;
 }
 									/*}}}*/
 // DepCache::IsInstallOk - check if it is ok to install this package	/*{{{*/
@@ -1813,22 +2055,24 @@ void pkgDepCache::StateCache::Update(PkgIterator Pkg,pkgCache &Cache)
 {
    // Some info
    VerIterator Ver = CandidateVerIter(Cache);
-   
+
    // Use a null string or the version string
    if (Ver.end() == true)
       CandVersion = "";
    else
       CandVersion = Ver.VerStr();
-   
+
    // Find the current version
-   CurVersion = "";
    if (Pkg->CurrentVer != 0)
       CurVersion = Pkg.CurrentVer().VerStr();
+   else
+      CurVersion = "";
 
    // Figure out if its up or down or equal
-   Status = Ver.CompareVer(Pkg.CurrentVer());
    if (Pkg->CurrentVer == 0 || Pkg->VersionList == 0 || CandidateVer == 0)
-     Status = 2;      
+      Status = 2;
+   else
+      Status = Ver.CompareVer(Pkg.CurrentVer());
 }
 									/*}}}*/
 // Policy::GetCandidateVer - Returns the Candidate install version	/*{{{*/
@@ -1978,7 +2222,7 @@ bool pkgDepCache::MarkRequired(InRootSetFunc &userFunc)
 	 reason = "Required";
       else if (userFunc.InRootSet(P))
 	 reason = "Blacklisted [APT::NeverAutoRemove]";
-      else if (IsModeChangeOk(ModeGarbage, P, 0, false) == false)
+      else if (not IsModeChangeOk(*this, ModeGarbage, P, 0, false, DebugMarker))
 	 reason = "Hold";
       else
 	 continue;

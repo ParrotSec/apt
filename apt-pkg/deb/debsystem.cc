@@ -270,7 +270,7 @@ static std::string getDpkgStatusLocation(Configuration const &Cnf) {
    Configuration PathCnf;
    PathCnf.Set("Dir", Cnf.Find("Dir", "/"));
    PathCnf.Set("Dir::State::status", "status");
-   auto const cnfstatedir = Cnf.Find("Dir::State", STATE_DIR + 1);
+   auto const cnfstatedir = Cnf.Find("Dir::State", &STATE_DIR[1]);
    // if the state dir ends in apt, replace it with dpkg -
    // for the default this gives us the same as the fallback below.
    // This can't be a ../dpkg as that would play bad with symlinks
@@ -466,8 +466,13 @@ pid_t debSystem::ExecDpkg(std::vector<std::string> const &sArgs, int * const inp
 									/*}}}*/
 bool debSystem::MultiArchSupported() const					/*{{{*/
 {
+   return AssertFeature("multi-arch");
+}
+									/*}}}*/
+bool debSystem::AssertFeature(std::string const &feature) /*{{{*/
+{
    std::vector<std::string> Args = GetDpkgBaseCommand();
-   Args.push_back("--assert-multi-arch");
+   Args.push_back("--assert-" + feature);
    pid_t const dpkgAssertMultiArch = ExecDpkg(Args, nullptr, nullptr, true);
    if (dpkgAssertMultiArch > 0)
    {

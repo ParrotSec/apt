@@ -58,6 +58,8 @@ pkgSimulate::pkgSimulate(pkgDepCache *Cache) : pkgPackageManager(Cache),
    string Jnk = "SIMULATE";
    for (decltype(PackageCount) I = 0; I != PackageCount; ++I)
       FileNames[I] = Jnk;
+
+   Cache->CheckConsistency("simulate");
 }
 									/*}}}*/
 // Simulate::~Simulate - Destructor					/*{{{*/
@@ -515,18 +517,37 @@ void pkgProblemResolver::MakeScores()
 	 Score += PrioInstalledAndNotObsolete;
 
       // propagate score points along dependencies
-      for (pkgCache::DepIterator D = InstVer.DependsList(); D.end() == false; ++D)
+      for (pkgCache::DepIterator D = InstVer.DependsList(); not D.end(); ++D)
       {
 	 if (DepMap[D->Type] == 0)
 	    continue;
 	 pkgCache::PkgIterator const T = D.TargetPkg();
-	 if (D->Version != 0)
+	 if (not D.IsIgnorable(T))
 	 {
-	    pkgCache::VerIterator const IV = Cache[T].InstVerIter(Cache);
-	    if (IV.end() == true || D.IsSatisfied(IV) == false)
-	       continue;
+	    if (D->Version != 0)
+	    {
+	       pkgCache::VerIterator const IV = Cache[T].InstVerIter(Cache);
+	       if (IV.end() || not D.IsSatisfied(IV))
+		  continue;
+	    }
+	    Scores[T->ID] += DepMap[D->Type];
 	 }
-	 Scores[T->ID] += DepMap[D->Type];
+
+	 std::vector<map_id_t> providers;
+	 for (auto Prv = T.ProvidesList(); not Prv.end(); ++Prv)
+	 {
+	    if (D.IsIgnorable(Prv))
+	       continue;
+	    auto const PV = Prv.OwnerVer();
+	    auto const PP = PV.ParentPkg();
+	    if (PV != Cache[PP].InstVerIter(Cache) || not D.IsSatisfied(Prv))
+	       continue;
+	    providers.push_back(PP->ID);
+	 }
+	 std::sort(providers.begin(), providers.end());
+	 providers.erase(std::unique(providers.begin(), providers.end()), providers.end());
+	 for (auto const prv : providers)
+	    Scores[prv] += DepMap[D->Type];
       }
    }
 
@@ -562,13 +583,25 @@ void pkgProblemResolver::MakeScores()
       provide important packages extremely important */
    for (pkgCache::PkgIterator I = Cache.PkgBegin(); I.end() == false; ++I)
    {
-      for (pkgCache::PrvIterator P = I.ProvidesList(); P.end() == false; ++P)
+      auto const transfer = abs(Scores[I->ID] - OldScores[I->ID]);
+      if (transfer == 0)
+	 continue;
+
+      std::vector<map_id_t> providers;
+      for (auto Prv = I.ProvidesList(); not Prv.end(); ++Prv)
       {
-	 // Only do it once per package
-	 if ((pkgCache::Version *)P.OwnerVer() != Cache[P.OwnerPkg()].InstallVer)
+	 if (Prv.IsMultiArchImplicit())
 	    continue;
-	 Scores[P.OwnerPkg()->ID] += abs(Scores[I->ID] - OldScores[I->ID]);
+	 auto const PV = Prv.OwnerVer();
+	 auto const PP = PV.ParentPkg();
+	 if (PV != Cache[PP].InstVerIter(Cache))
+	    continue;
+	 providers.push_back(PP->ID);
       }
+      std::sort(providers.begin(), providers.end());
+      providers.erase(std::unique(providers.begin(), providers.end()), providers.end());
+      for (auto const prv : providers)
+	 Scores[prv] += transfer;
    }
 
    /* Protected things are pushed really high up. This number should put them
@@ -599,7 +632,8 @@ bool pkgProblemResolver::DoUpgrade(pkgCache::PkgIterator Pkg)
    Flags[Pkg->ID] &= ~Upgradable;
    
    bool WasKept = Cache[Pkg].Keep();
-   Cache.MarkInstall(Pkg, false, 0, false);
+   if (not Cache.MarkInstall(Pkg, false, 0, false))
+     return false;
 
    // This must be a virtual package or something like that.
    if (Cache[Pkg].InstVerIter(Cache).end() == true)
@@ -633,7 +667,7 @@ bool pkgProblemResolver::DoUpgrade(pkgCache::PkgIterator Pkg)
 	 
 	 // Do not change protected packages
 	 PkgIterator P = Start.SmartTargetPkg();
-	 if ((Flags[P->ID] & Protected) == Protected)
+	 if (Cache[P].Protect())
 	 {
 	    if (Debug == true)
 	       clog << "    Reinst Failed because of protected " << P.FullName(false) << endl;
@@ -720,6 +754,9 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 {
    pkgDepCache::ActionGroup group(Cache);
 
+   if (Debug)
+      Cache.CheckConsistency("resolve start");
+
    // Record which packages are marked for install
    bool Again = false;
    do
@@ -787,8 +824,9 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
       changing a breaks c) */
    bool Change = true;
    bool const TryFixByInstall = _config->FindB("pkgProblemResolver::FixByInstall", true);
+   int const MaxCounter = _config->FindI("pkgProblemResolver::MaxCounter", 20);
    std::vector<PackageKill> KillList;
-   for (int Counter = 0; Counter != 10 && Change == true; Counter++)
+   for (int Counter = 0; Counter < MaxCounter && Change; ++Counter)
    {
       Change = false;
       for (pkgCache::Package **K = PList.get(); K != PEnd; K++)
@@ -800,7 +838,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	 if (Cache[I].CandidateVer != Cache[I].InstallVer &&
 	     I->CurrentVer != 0 && Cache[I].InstallVer != 0 &&
 	     (Flags[I->ID] & PreInstalled) != 0 &&
-	     (Flags[I->ID] & Protected) == 0 &&
+	     not Cache[I].Protect() &&
 	     (Flags[I->ID] & ReInstateTried) == 0)
 	 {
 	    if (Debug == true)
@@ -835,7 +873,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	 pkgCache::DepIterator End;
 	 size_t OldSize = 0;
 
-	 KillList.resize(0);
+	 KillList.clear();
 	 
 	 enum {OrRemove,OrKeep} OrOp = OrRemove;
 	 for (pkgCache::DepIterator D = Cache[I].InstVerIter(Cache).DependsList();
@@ -849,7 +887,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	       {
 		  if (OrOp == OrRemove)
 		  {
-		     if ((Flags[I->ID] & Protected) != Protected)
+		     if (not Cache[I].Protect())
 		     {
 			if (Debug == true)
 			   clog << "  Or group remove for " << I.FullName(false) << endl;
@@ -903,7 +941,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	       targets then we keep the package and bail. This is necessary
 	       if a package has a dep on another package that can't be found */
 	    std::unique_ptr<pkgCache::Version *[]> VList(Start.AllTargets());
-	    if (VList[0] == 0 && (Flags[I->ID] & Protected) != Protected &&
+	    if (VList[0] == 0 && not Cache[I].Protect() &&
 		Start.IsNegative() == false &&
 		Cache[I].NowBroken() == false)
 	    {	       
@@ -950,7 +988,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 		    End.IsNegative() == false))
 	       {
 		  // Try a little harder to fix protected packages..
-		  if ((Flags[I->ID] & Protected) == Protected)
+		  if (Cache[I].Protect())
 		  {
 		     if (DoUpgrade(Pkg) == true)
 		     {
@@ -1037,7 +1075,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 		  }
 
 		  // Skip adding to the kill list if it is protected
-		  if ((Flags[Pkg->ID] & Protected) != 0)
+		  if (Cache[Pkg].Protect() && Cache[Pkg].Mode != pkgDepCache::ModeDelete)
 		     continue;
 		
 		  if (Debug == true)
@@ -1053,7 +1091,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	    // Hm, nothing can possibly satisfy this dep. Nuke it.
 	    if (VList[0] == 0 &&
 		Start.IsNegative() == false &&
-		(Flags[I->ID] & Protected) != Protected)
+		not Cache[I].Protect())
 	    {
 	       bool Installed = Cache[I].Install();
 	       Cache.MarkKeep(I);
@@ -1093,33 +1131,38 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
 	 // Apply the kill list now
 	 if (Cache[I].InstallVer != 0)
 	 {
-	    for (auto J = KillList.begin(); J != KillList.end(); J++)
+	    for (auto const &J : KillList)
 	    {
-	       Change = true;
-	       if ((Cache[J->Dep] & pkgDepCache::DepGNow) == 0)
+	       bool foundSomething = false;
+	       if ((Cache[J.Dep] & pkgDepCache::DepGNow) == 0)
 	       {
-		  if (J->Dep.IsNegative() == true)
+		  if (J.Dep.IsNegative() && Cache.MarkDelete(J.Pkg, false, 0, false))
 		  {
-		     if (Debug == true)
-			clog << "  Fixing " << I.FullName(false) << " via remove of " << J->Pkg.FullName(false) << endl;
-		     Cache.MarkDelete(J->Pkg, false, 0, false);
+		     if (Debug)
+			std::clog << "  Fixing " << I.FullName(false) << " via remove of " << J.Pkg.FullName(false) << '\n';
+		     foundSomething = true;
 		  }
 	       }
-	       else
+	       else if (Cache.MarkKeep(J.Pkg, false, false))
 	       {
-		  if (Debug == true)
-		     clog << "  Fixing " << I.FullName(false) << " via keep of " << J->Pkg.FullName(false) << endl;
-		  Cache.MarkKeep(J->Pkg, false, false);
+		  if (Debug)
+		     std::clog << "  Fixing " << I.FullName(false) << " via keep of " << J.Pkg.FullName(false) << '\n';
+		  foundSomething = true;
 	       }
 
-	       if (Counter > 1)
+	       if (not foundSomething || Counter > 1)
 	       {
-		  if (Scores[I->ID] > Scores[J->Pkg->ID])		  
-		     Scores[J->Pkg->ID] = Scores[I->ID];
-	       }	       
-	    }      
+		  if (Scores[I->ID] > Scores[J.Pkg->ID])
+		  {
+		     Scores[J.Pkg->ID] = Scores[I->ID];
+		     Change = true;
+		  }
+	       }
+	       if (foundSomething)
+		  Change = true;
+	    }
 	 }
-      }      
+      }
    }
 
    if (Debug == true)
@@ -1133,7 +1176,7 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
       {
 	 if (Cache[I].InstBroken() == false)
 	    continue;
-	 if ((Flags[I->ID] & Protected) != Protected)
+	 if (not Cache[I].Protect())
 	    return _error->Error(_("Error, pkgProblemResolver::Resolve generated breaks, this may be caused by held packages."));
       }
       return _error->Error(_("Unable to correct problems, you have held broken packages."));
@@ -1151,6 +1194,8 @@ bool pkgProblemResolver::ResolveInternal(bool const BrokenFix)
       }
    }
 
+   if (Debug)
+      Cache.CheckConsistency("resolve done");
 
    return true;
 }
@@ -1210,6 +1255,9 @@ bool pkgProblemResolver::ResolveByKeepInternal()
 {
    pkgDepCache::ActionGroup group(Cache);
 
+   if (Debug)
+      Cache.CheckConsistency("keep start");
+
    MakeScores();
 
    /* We have to order the packages so that the broken fixing pass 
@@ -1253,7 +1301,7 @@ bool pkgProblemResolver::ResolveByKeepInternal()
 
       /* Keep the package. If this works then great, otherwise we have
 	 to be significantly more aggressive and manipulate its dependencies */
-      if ((Flags[I->ID] & Protected) == 0)
+      if (not Cache[I].Protect())
       {
 	 if (Debug == true)
 	    clog << "Keeping package " << I.FullName(false) << endl;
@@ -1301,7 +1349,7 @@ bool pkgProblemResolver::ResolveByKeepInternal()
 		   Pkg->CurrentVer == 0)
 		  continue;
 	       
-	       if ((Flags[I->ID] & Protected) == 0)
+	       if (not Cache[I].Protect())
 	       {
 		  if (Debug == true)
 		     clog << "  Keeping Package " << Pkg.FullName(false) << " due to " << Start.DepType() << endl;
@@ -1340,6 +1388,10 @@ bool pkgProblemResolver::ResolveByKeepInternal()
    }
 
    delete[] PList;
+
+   if (Debug)
+      Cache.CheckConsistency("keep done");
+
    return true;
 }
 									/*}}}*/

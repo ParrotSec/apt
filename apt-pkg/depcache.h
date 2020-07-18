@@ -368,6 +368,7 @@ class APT_PUBLIC pkgDepCache : protected pkgCache::Namespace
    inline StateCache &operator [](PkgIterator const &I) {return PkgState[I->ID];};
    inline StateCache &operator [](PkgIterator const &I) const {return PkgState[I->ID];};
    inline unsigned char &operator [](DepIterator const &I) {return DepState[I->ID];};
+   inline unsigned char const &operator [](DepIterator const &I) const {return DepState[I->ID];};
 
    /** \return A function identifying packages in the root set other
     *  than manually installed packages and essential packages, or \b
@@ -501,6 +502,8 @@ class APT_PUBLIC pkgDepCache : protected pkgCache::Namespace
    pkgDepCache(pkgCache * const Cache,Policy * const Plcy = 0);
    virtual ~pkgDepCache();
 
+   bool CheckConsistency(char const *const msgtag = "");
+
    protected:
    // methods call by IsInstallOk
    bool IsInstallOkMultiArchSameVersionSynced(PkgIterator const &Pkg,
@@ -515,14 +518,10 @@ class APT_PUBLIC pkgDepCache : protected pkgCache::Namespace
    private:
    void * const d;
 
-   APT_HIDDEN bool IsModeChangeOk(ModeList const mode, PkgIterator const &Pkg,
-			unsigned long const Depth, bool const FromUser);
-
    APT_HIDDEN bool MarkInstall_StateChange(PkgIterator const &Pkg, bool AutoInst, bool FromUser);
-   APT_HIDDEN bool MarkInstall_CollectDependencies(pkgCache::VerIterator const &PV, std::vector<pkgCache::DepIterator> &toInstall, std::vector<pkgCache::DepIterator> &toRemove);
-   APT_HIDDEN bool MarkInstall_RemoveConflictsIfNotUpgradeable(pkgCache::VerIterator const &PV, unsigned long Depth, std::vector<pkgCache::DepIterator> &toRemove, APT::PackageVector &toUpgrade);
-   APT_HIDDEN bool MarkInstall_UpgradeOrRemoveConflicts(bool const propagateProtected, unsigned long Depth, bool const ForceImportantDeps, APT::PackageVector &toUpgrade);
-   APT_HIDDEN bool MarkInstall_InstallDependencies(PkgIterator const &Pkg, unsigned long Depth, bool const ForceImportantDeps, std::vector<pkgCache::DepIterator> &toInstall, APT::PackageVector *const toMoveAuto, bool const propagateProtected, bool const FromUser);
+   APT_HIDDEN bool MarkInstall_DiscardInstall(PkgIterator const &Pkg);
+
+   APT_HIDDEN void PerformDependencyPass(OpProgress * const Prog);
 };
 
 #endif
