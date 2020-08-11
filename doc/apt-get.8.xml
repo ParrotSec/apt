@@ -14,7 +14,7 @@
    &apt-email;
    &apt-product;
    <!-- The last update date -->
-   <date>2020-01-15T00:00:00Z</date>
+   <date>2020-02-27T00:00:00Z</date>
  </refentryinfo>
  
  <refmeta>
@@ -543,6 +543,16 @@
      related to <option>--assume-yes</option>; where <option>--assume-yes</option> will answer 
      yes to any prompt, <option>--trivial-only</option> will answer no. 
      Configuration Item: <literal>APT::Get::Trivial-Only</literal>.</para></listitem>
+     </varlistentry>
+
+     <varlistentry><term><option>--mark-auto</option></term>
+     <listitem><para>
+     After successful installation, mark all freshly installed packages as
+     automatically installed, which will cause each of the packages to be
+     removed when no more manually installed packages depend on this package.
+     This is equally to running <command>apt-mark auto</command> for all
+     installed packages.
+     Configuration Item: <literal>APT::Get::Mark-Auto</literal>.</para></listitem>
      </varlistentry>
 
      <varlistentry><term><option>--no-remove</option></term>
