@@ -372,7 +372,7 @@ BaseHttpMethod::DealWithHeaders(FetchResult &Res, RequestState &Req)
 	 // as well as http to https
 	 else if ((Uri.Access == "http" || Uri.Access == "https+http") && tmpURI.Access == "https")
 	    return TRY_AGAIN_OR_REDIRECT;
-			// allow https to http redirects (for https mirrordirectors with http mirrors)
+	 // allow https to http redirects (for https mirrordirectors with http mirrors)
 	 else if ((Uri.Access == "https" || Uri.Access == "https+http") && tmpURI.Access == "http")
 	 	return TRY_AGAIN_OR_REDIRECT;
 	 else
@@ -773,33 +773,24 @@ int BaseHttpMethod::Loop()
 	    }
 	    else
 	    {
-	       if (Server->IsOpen() == false)
+	       if (not Server->IsOpen())
 	       {
-		  FailCounter++;
-		  _error->Discard();
-		  Server->Close();
-		  
-		  if (FailCounter >= 2)
-		  {
-		     Fail(_("Connection failed"),true);
-		     FailCounter = 0;
-		  }
-		  
+		  // Reset the pipeline
 		  QueueBack = Queue;
+		  Server->PipelineAnswersReceived = 0;
 	       }
-	       else
-               {
-                  Server->Close();
-		  switch (Result)
-		  {
-		  case ResultState::TRANSIENT_ERROR:
-		     Fail(true);
-		     break;
-		  case ResultState::FATAL_ERROR:
-		  case ResultState::SUCCESSFUL:
-		     Fail(false);
-		     break;
-		  }
+
+	       Server->Close();
+	       FailCounter = 0;
+	       switch (Result)
+	       {
+	       case ResultState::TRANSIENT_ERROR:
+		  Fail(true);
+		  break;
+	       case ResultState::FATAL_ERROR:
+	       case ResultState::SUCCESSFUL:
+		  Fail(false);
+		  break;
 	       }
 	    }
 	    break;
