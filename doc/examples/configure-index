@@ -54,6 +54,9 @@ APT
   Build-Profiles "<STRING_OR_LIST>";
 
   NeverAutoRemove "<LIST>";  // list of package name regexes
+  LastInstalledKernel "<STRING>"; // last installed kernel version
+  VersionedKernelPackages "<LIST>"; // regular expressions to be protected from autoremoval (kernel uname will be appended)
+  Protect-Kernels "<BOOL>"; // whether to protect installed kernels against autoremoval (default: true)
 
   // Options for apt-get
   Get
@@ -77,7 +80,9 @@ APT
      Remove "<BOOL>";
      AllowUnauthenticated "<BOOL>"; // skip security
 
-     AutomaticRemove "<BOOL>";
+     AutomaticRemove "<BOOL>" {
+        "Kernels" "<BOOL>";     // Allow removing kernels even if not removing other packages (true for dist-upgrade)
+     };
      HideAutoRemove "<STRING_OR_BOOL>"; // yes, no, small
 
      Simulate "<BOOL>";
@@ -96,6 +101,8 @@ APT
      Upgrade "<BOOL>";
      Only-Upgrade "<BOOL>";
      Upgrade-Allow-New "<BOOL>";
+     Always-Include-Phased-Updates "<BOOL>";
+     Never-Include-Phased-Updates "<BOOL>";
      Purge "<BOOL>";
      ReInstall "<BOOL>";
      Compile "<BOOL>";
@@ -159,6 +166,7 @@ APT
   {
      Pre-Invoke {"touch /var/lib/apt/pre-update-stamp"; };
      Post-Invoke {"touch /var/lib/apt/post-update-stamp"; };
+     Error-Mode "<STRING>";
   };
 
   /* define a new supported compressor on the fly
@@ -214,6 +222,8 @@ APT
 
   // control parameters for cron jobs by /etc/cron.daily/apt documented there
   Periodic {};
+
+  Machine-ID "<STRING>"; // Value of /etc/machine-id
 };
 
 // Options for the downloading routines
@@ -223,6 +233,8 @@ Acquire
   Retries "<INT>";
   Source-Symlinks "<BOOL>";
   ForceHash "<STRING>"; // hashmethod used for expected hash: sha256, sha1 or md5sum
+  Send-URI-Encoded "<BOOL>"; // false does the old encode/decode dance even if we could avoid it
+  URIEncode "<STRING>"; // characters to encode with percent encoding
 
   AllowTLS "<BOOL>";    // whether support for tls is enabled
 
@@ -410,6 +422,7 @@ Dir "<DIR>"
      SourceParts "<DIR>";
      Trusted "<FILE>";
      TrustedParts "<DIR>";
+     Machine-ID "<FILE>";   // by default points to ../machine-id effectively
   };
 
   // Locations of binaries
@@ -427,6 +440,7 @@ Dir "<DIR>"
      bzip2 "<PROGRAM_PATH>";
      lzma "<PROGRAM_PATH>";
      uncompressed "<PROGRAM_PATH>";
+     ischroot "<PROGRAM_PATH>";
 
      solvers "<LIST>"; // of directories
      planners "<LIST>"; // of directories
@@ -554,6 +568,7 @@ Debug
   APT::Progress::PackageManagerFd "<BOOL>";
   SetupAPTPartialDirectory::AssumeGood "<BOOL>";
   Locking "<BOOL>";
+  Phasing "<BOOL>";
 };
 
 pkgCacheGen
@@ -830,6 +845,12 @@ dir::filelistdir "<STRING>";
 dir::dpkg::tupletable "<FILE>";
 dir::dpkg::triplettable "<FILE>";
 dir::dpkg::cputable "<FILE>";
+Rred::t "<BOOL>";
+Rred::f "<BOOL>";
+Rred::Compress "<STRING>";
 
 APT::Internal::OpProgress::Absolute "<BOOL>";
 APT::Color "<BOOL>";
+
+update-manager::always-include-phased-updates "<BOOL>";
+update-manager::never-include-phased-updates "<BOOL>";

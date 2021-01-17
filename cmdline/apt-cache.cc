@@ -980,15 +980,13 @@ static bool ShowPkgNames(CommandLine &CmdL)
    if (unlikely(CacheFile.BuildCaches(NULL, false) == false))
       return false;
    pkgCache::GrpIterator I = CacheFile.GetPkgCache()->GrpBegin();
-   bool const All = _config->FindB("APT::Cache::AllNames","false");
+   bool const All = _config->FindB("APT::Cache::AllNames", false);
 
    if (CmdL.FileList[1] != 0)
    {
       for (;I.end() != true; ++I)
       {
-	 if (All == false && I->FirstPackage == 0)
-	    continue;
-	 if (I.FindPkg("any")->VersionList == 0)
+	 if (All == false && (I.PackageList().end() || I.PackageList()->VersionList == 0))
 	    continue;
 	 if (strncmp(I.Name(),CmdL.FileList[1],strlen(CmdL.FileList[1])) == 0)
 	    cout << I.Name() << endl;
@@ -1000,13 +998,11 @@ static bool ShowPkgNames(CommandLine &CmdL)
    // Show all pkgs
    for (;I.end() != true; ++I)
    {
-      if (All == false && I->FirstPackage == 0)
-	 continue;
-      if (I.FindPkg("any")->VersionList == 0)
+      if (All == false && (I.PackageList().end() || I.PackageList()->VersionList == 0))
 	 continue;
       cout << I.Name() << endl;
    }
-   
+
    return true;
 }
 									/*}}}*/

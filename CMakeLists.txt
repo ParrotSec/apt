@@ -80,8 +80,8 @@ add_optional_compile_options(Wsuggest-override)
 add_optional_compile_options(Werror=suggest-override)
 add_optional_compile_options(Werror=return-type)
 # apt-ftparchive dependencies
-find_package(BerkeleyDB REQUIRED)
-if (BERKELEY_DB_FOUND)
+find_package(Berkeley REQUIRED)
+if (BERKELEY_FOUND)
   set(HAVE_BDB 1)
 endif()
 
@@ -113,7 +113,7 @@ if (LZ4_FOUND)
   set(HAVE_LZ4 1)
 endif()
 
-find_package(Zstd)
+find_package(ZSTD)
 if (ZSTD_FOUND)
   set(HAVE_ZSTD 1)
 endif()
@@ -129,12 +129,13 @@ if (SYSTEMD_FOUND)
   set(HAVE_SYSTEMD 1)
 endif()
 
-find_package(Seccomp)
+find_package(SECCOMP)
 if (SECCOMP_FOUND)
   set(HAVE_SECCOMP 1)
 endif()
 
-find_package(Gcrypt REQUIRED)
+find_package(GCRYPT REQUIRED)
+find_package(XXHASH REQUIRED)
 
 # Mount()ing and stat()ing and friends
 check_symbol_exists(statfs sys/vfs.h HAVE_VFS_H)
@@ -204,7 +205,7 @@ check_cxx_target(HAVE_FMV_SSE42_AND_CRC32DI "sse4.2" "__builtin_ia32_crc32di(0,i
 # Configure some variables like package, version and architecture.
 set(PACKAGE ${PROJECT_NAME})
 set(PACKAGE_MAIL "APT Development Team <deity@lists.debian.org>")
-set(PACKAGE_VERSION "2.1.11")
+set(PACKAGE_VERSION "2.1.18")
 string(REGEX MATCH "^[0-9.]+" PROJECT_VERSION ${PACKAGE_VERSION})
 
 if (NOT DEFINED DPKG_DATADIR)

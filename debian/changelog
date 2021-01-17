@@ -1,3 +1,140 @@
+apt (2.1.18+parrot1) rolling-testing; urgency=medium
+
+  * import new Debian release.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sun, 17 Jan 2021 16:43:39 +0100
+
+apt (2.1.18) unstable; urgency=high
+
+  * pkgcachegen: Avoid write to old cache for Version::Extra (Closes: #980037)
+  * Adjust apt-mark test for dpkg 1.20.7
+
+ -- Julian Andres Klode <jak@debian.org>  Wed, 13 Jan 2021 17:37:30 +0100
+
+apt (2.1.17) unstable; urgency=medium
+
+  [ Américo Monteiro ]
+  * Portuguese manpages translation update (Closes: #979725)
+
+  [ Julian Andres Klode ]
+  * kernels: Fix std::out_of_range if no kernels to protect
+  * Call ischroot with -t
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 11 Jan 2021 12:10:32 +0100
+
+apt (2.1.16) unstable; urgency=medium
+
+  [ Faidon Liambotis ]
+  * Various fixes to http and connect method
+    - basehttp: also consider Access when a Server's URI
+    - connect: convert a C-style string to std::string
+    - connect: use ServiceNameOrPort, not Port, as the cache key
+
+  [ Julian Andres Klode ]
+  * patterns: Add dependency patterns ?depends, ?conflicts, etc.
+    Note that the -broken- variants are not implemented yet.
+  * Rewrite of the kernel autoremoval code:
+    - Determine autoremovable kernels at run-time (LP: #1615381), this fixes the
+      issue where apt could consider a running kernel autoremovable
+    - Automatically remove unused kernels on apt {full,dist}-upgrade.
+      This helps ensuring that we don't run out of /boot space.
+    - Only keep up to 3 (not 4) kernels.
+      Ubuntu boot partitions were sized for 3 kernels, not 4.
+  * Bump codenames to bullseye/hirsute and adjust -security codename for
+    bullseye (Closes: #969932)
+  * Ignore failures from immediate configuration. This does not change the
+    actual installation ordering - we never passed the return code to the
+    caller and installation went underway anyway if it could be ordered at a
+    later stage, this just removes spurious after-the-fact errors.
+    (Closes: #973305, #188161, #211075, #649588) (LP: #1871268)
+  * Add support for Phased-Update-Percentage, previously used only by
+    update-manager.
+  * Implement update --error-on=any so that scripts can reliably check for
+    transient failures as well. (Closes: #594813)
+
+  [ Demi M. Obenour ]
+  * test/integration/framework: Be compatible with Bash
+
+  [ Vangelis Skarmoutsos ]
+  * Greek program translation update
+
+ -- Julian Andres Klode <jak@debian.org>  Fri, 08 Jan 2021 21:49:15 +0100
+
+apt (2.1.15) unstable; urgency=medium
+
+  [ Julian Andres Klode ]
+  * Unroll pkgCache::sHash 8 time, break up dependency
+  * Do not require libxxhash-dev for including pkgcachegen.h (Closes: #978171)
+
+  [ David Kalnischkies ]
+  * Proper URI encoding for config requests to our test webserver
+  * Keep URIs encoded in the acquire system
+  * Implement encoded URI handling in all methods
+  * Don't re-encode encoded URIs in pkgAcqFile
+
+  [ Helge Kreutzmann ]
+  * German program translation update (Closes: #977938)
+
+ -- Julian Andres Klode <jak@debian.org>  Sun, 27 Dec 2020 09:53:07 +0100
+
+apt (2.1.14) unstable; urgency=medium
+
+  * test: fixup for hash table size increase (changed output order)
+  * Use XXH3 for cache, hash table hashing
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 15 Dec 2020 14:07:36 +0100
+
+apt (2.1.13) unstable; urgency=medium
+
+  [ Debian Janitor ]
+  * Apply multi-arch hints.
+    + apt-doc, libapt-pkg-doc: Add Multi-Arch: foreign.
+
+  [ Jordi Mallach ]
+  * Fix typo in Catalan translation.
+
+  [ David Kalnischkies ]
+  * Prepare rred binary for external usage
+  * Support reading compressed patches in rred direct call modes
+  * Support compressed output from rred similar to apt-helper cat-file
+
+  [ Julian Andres Klode ]
+  * gitignore: Add /build and /obj-* build dirs
+  * gitignore: Add .*.swp files
+  * HexDigest: Silence -Wstringop-overflow
+  * patterns: Terminate short pattern by ~ and !
+  * SECURITY UPDATE: Integer overflow in parsing (LP: #1899193)
+    - apt-pkg/contrib/arfile.cc: add extra checks.
+    - apt-pkg/contrib/tarfile.cc: limit tar item sizes to 128 GiB
+    - apt-pkg/deb/debfile.cc: limit control file sizes to 64 MiB
+    - test/*: add tests.
+    - CVE-2020-27350
+  * Additional hardening:
+    - apt-pkg/contrib/tarfile.cc: Limit size of long names and links to 1 MiB
+  * Raise APT::Cache-HashtableSize to 196613
+
+ -- Julian Andres Klode <jak@debian.org>  Thu, 10 Dec 2020 15:40:27 +0100
+
+apt (2.1.12) unstable; urgency=medium
+
+  [ Julian Andres Klode ]
+  * pkgnames: Correctly set the default for AllNames to false (LP: #1876495)
+  * pkgnames: Do not exclude virtual packages with --all-names
+  * Remove expired domain that became nsfw from debian/changelog
+  * Do not immediately configure m-a: same packages in lockstep (LP: #1871268)
+
+  [ Américo Monteiro ]
+  * Portuguese manpages translation update (Closes: #968414)
+
+  [ David Kalnischkies ]
+  * Rename CMake find_package helpers to avoid developer warnings
+  * Install translated apt-patterns(7) man pages
+  * Remove ancient versions support from apts postinst
+  * Update libapt-pkg6.0 symbols file
+  * Refresh lintian-overrides of apt and libapt-pkg-doc
+
+ -- Julian Andres Klode <jak@debian.org>  Mon, 23 Nov 2020 17:52:37 +0100
+
 apt (2.1.11+parrot1) rolling-testing; urgency=medium
 
   * NImport new Debian release.

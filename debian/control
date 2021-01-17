@@ -23,6 +23,7 @@ Build-Depends: cmake (>= 3.4),
                libseccomp-dev (>= 2.4.2) [amd64 arm64 armel armhf i386 mips mips64el mipsel ppc64el s390x hppa powerpc powerpcspe ppc64 x32],
                libsystemd-dev [linux-any],
                libudev-dev [linux-any],
+               libxxhash-dev (>= 0.8),
                libzstd-dev (>= 1.0),
                ninja-build,
                pkg-config,
@@ -99,6 +100,7 @@ Architecture: all
 Priority: optional
 Depends: ${misc:Depends}
 Section: doc
+Multi-Arch: foreign
 Description: documentation for APT
  This package contains the user guide and offline guide for various
  APT tools which are provided in a html and a text-only version.
@@ -122,6 +124,7 @@ Architecture: all
 Priority: optional
 Depends: ${misc:Depends}
 Section: doc
+Multi-Arch: foreign
 Description: documentation for APT development
  This package contains documentation for development of the APT
  Debian package manipulation program and its libraries.

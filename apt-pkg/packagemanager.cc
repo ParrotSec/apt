@@ -609,7 +609,8 @@ bool pkgPackageManager::SmartConfigure(PkgIterator Pkg, int const Depth)
 
    List->Flag(Pkg,pkgOrderList::Configured,pkgOrderList::States);
 
-   if ((Cache[Pkg].InstVerIter(Cache)->MultiArch & pkgCache::Version::Same) == pkgCache::Version::Same)
+   if ((Cache[Pkg].InstVerIter(Cache)->MultiArch & pkgCache::Version::Same) == pkgCache::Version::Same &&
+       not List->IsFlag(Pkg, pkgOrderList::Immediate))
       for (PkgIterator P = Pkg.Group().PackageList();
 	   P.end() == false; P = Pkg.Group().NextPkg(P))
       {
@@ -1005,10 +1006,18 @@ bool pkgPackageManager::SmartUnPack(PkgIterator Pkg, bool const Immediate, int c
       return false;
 
    if (Immediate == true) {
-      // Perform immediate configuration of the package. 
-         if (SmartConfigure(Pkg, Depth + 1) == false)
-            _error->Warning(_("Could not perform immediate configuration on '%s'. "
-               "Please see man 5 apt.conf under APT::Immediate-Configure for details. (%d)"),Pkg.FullName().c_str(),2);
+      // Perform immediate configuration of the package.
+      _error->PushToStack();
+      bool configured = SmartConfigure(Pkg, Depth + 1);
+      _error->RevertToStack();
+
+      if (not configured && Debug) {
+	 clog << OutputInDepth(Depth);
+	 ioprintf(clog, _("Could not perform immediate configuration on '%s'. "
+			   "Please see man 5 apt.conf under APT::Immediate-Configure for details. (%d)"),
+			 Pkg.FullName().c_str(), 2);
+	 clog << endl;
+      }
    }
    
    return true;

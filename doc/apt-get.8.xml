@@ -14,7 +14,7 @@
    &apt-email;
    &apt-product;
    <!-- The last update date -->
-   <date>2020-02-27T00:00:00Z</date>
+   <date>2021-01-08T00:00:00Z</date>
  </refentryinfo>
  
  <refmeta>
@@ -644,6 +644,10 @@
      Adds the given file as a source for metadata. Can be repeated to add multiple files.
      See <option>--with-source</option> description in &apt-cache; for further details.
      </para></listitem>
+     </varlistentry>
+
+     <varlistentry><term><option>-e<replaceable>any</replaceable></option></term><term><option>--error-on=<replaceable>any</replaceable></option></term>
+     <listitem><para>Fail the update command if any error occured, even a transient one.</para></listitem>
      </varlistentry>
 
      &apt-commonoptions;

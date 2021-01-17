@@ -1,3 +1,18 @@
+apt (2.1.16) unstable; urgency=medium
+
+  Automatically remove unused kernels on apt {dist,full}-upgrade. To revert
+  to previous behavior, set APT::Get::AutomaticRemove::Kernels to false or
+  pass --no-auto-remove to the command. apt-get remains unchanged.
+
+  Packages files can now set the Phased-Update-Percentage field to restrict
+  update rollout to a specified percentage of machines. Previously, this has
+  only been available to users of Ubuntu's update-manager tool. See
+  apt_preferences(5) for details and how to configure multiple systems to get
+  the same updates. Phased updates are disabled in chroots for now to not
+  break buildd-style setups.
+
+ -- Julian Andres Klode <jak@debian.org>  Fri, 08 Jan 2021 22:01:50 +0100
+
 apt (1.9.11) experimental; urgency=medium
 
   apt(8) now waits for the lock indefinitely if connected to a tty, or

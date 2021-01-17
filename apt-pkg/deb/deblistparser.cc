@@ -11,6 +11,7 @@
 // Include Files							/*{{{*/
 #include <config.h>
 
+#include <apt-pkg/algorithms.h>
 #include <apt-pkg/aptconfiguration.h>
 #include <apt-pkg/cachefilter.h>
 #include <apt-pkg/configuration.h>
@@ -246,7 +247,12 @@ bool debListParser::NewVersion(pkgCache::VerIterator &Ver)
    
    if (ParseProvides(Ver) == false)
       return false;
-   
+   if (not APT::KernelAutoRemoveHelper::getUname(Ver.ParentPkg().Name()).empty())
+   {
+      if (not NewProvides(Ver, "$kernel", "any", Ver.VerStr(), pkgCache::Flag::MultiArchImplicit))
+	 return false;
+   }
+
    return true;
 }
 									/*}}}*/
@@ -331,6 +337,13 @@ bool debListParser::UsePackage(pkgCache::PkgIterator &Pkg,
    }
    else if (std::find(forceImportant.begin(), forceImportant.end(), Pkg.Name()) != forceImportant.end())
       Pkg->Flags |= pkgCache::Flag::Important;
+
+   auto phased = Section.FindULL(pkgTagSection::Key::Phased_Update_Percentage, 100);
+   if (phased != 100)
+   {
+      if (not Ver.PhasedUpdatePercentage(phased))
+	 _error->Warning("Ignoring invalid Phased-Update-Percentage value");
+   }
 
    if (ParseStatus(Pkg,Ver) == false)
       return false;
