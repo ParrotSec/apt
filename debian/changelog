@@ -1,8 +1,62 @@
-apt (2.1.18+parrot1) rolling-testing; urgency=medium
+apt (2.1.20+parrot1) rolling-testing; urgency=medium
 
-  * import new Debian release.
+  * Import new Debian release.
+  * Patch methods/basehttp.c to allow https-to-http redirects.
 
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sun, 17 Jan 2021 16:43:39 +0100
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sun, 21 Feb 2021 01:26:34 +0100
+
+apt (2.1.20) unstable; urgency=medium
+
+  * CI: Run test as user on i386
+  * Fix test suite regression from StrToNum fixes. The tests started failing
+    on 32-bit because the values were actually out of range, but we did not
+    test errno before the last version, so it was not treated as an error.
+
+ -- Julian Andres Klode <jak@debian.org>  Wed, 10 Feb 2021 00:03:05 +0100
+
+apt (2.1.19) unstable; urgency=medium
+
+  [ Helge Kreutzmann ]
+  * German program translation update (Closes: #979848)
+
+  [ Youfu Zhang ]
+  * dpkg: fix passing readonly /dev/null fd as stdout/stderr
+
+  [ Diederik de Haas ]
+  * Fix apt-acquire-additional-files entity's location.
+
+  [ Wolfgang Schweer ]
+  * vendor: Adjust Debian -security codename
+
+  [ Julian Andres Klode ]
+  * Include all translations when building the cache (LP: #1907850)
+
+  [ David Kalnischkies ]
+  * Various patches uplifted from unfinished fuzzer branches
+    - Use 500 MB memory limit for xz/lzma decoding
+    - Guess compressor only if no AR nember with exact name exists
+    - Free XXH3 state to avoid leak in cache hashing
+    - Fail ConfigDir reading if directory listing failed
+    - Retire and deprecate _strtabexpand
+    - Fix incorrect base64 encoding due to int promotion
+    - Don't parse \x and \0 past the end in DeEscapeString
+    - Remove Word size limit from ParseQuote and CWord
+    - Forbid negative values in unsigned StrToNum explicitly
+    - Avoid overstepping bounds in config file parsing
+    - Show 'Done' always for 'Building dependency tree'
+    - Avoid undefined pointer arithmetic while growing mmap
+    - Use error reporting instead of assert in rred patching
+    - Replace PrintStatus with SendMessage usage
+    - Ensure HTTP status code text has sensible content
+    - Limit on first patch size only for server-merged patches
+    - Use size of the old cache as APT::Cache-Start default
+    - Remove spurious periods on progress strings in po/de.po
+
+  [ Frans Spiesschaert ]
+  * Dutch program translation update (Closes: #981885)
+  * Dutch manpages translation update (Closes: #981883)
+
+ -- Julian Andres Klode <jak@debian.org>  Tue, 09 Feb 2021 10:41:53 +0100
 
 apt (2.1.18) unstable; urgency=high
 
@@ -115,6 +169,36 @@ apt (2.1.13) unstable; urgency=medium
 
  -- Julian Andres Klode <jak@debian.org>  Thu, 10 Dec 2020 15:40:27 +0100
 
+apt (2.1.12+deb11u1+parrot1) rolling-testing; urgency=medium
+
+  * Import new Debian release.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Fri, 15 Jan 2021 17:57:53 +0100
+
+apt (2.1.12+deb11u1) bullseye; urgency=medium
+
+  [ Julian Andres Klode ]
+  * patterns: Terminate short pattern by ~ and ! - this makes patterns
+    like ~n^apt!~nfoo$ or ~nfoo~nbar work correctly instead of treating
+    !~nfoo$ or ~nbar as part of the regular expression.
+  * SECURITY UPDATE: Integer overflow in parsing (LP: #1899193)
+    - apt-pkg/contrib/arfile.cc: add extra checks.
+    - apt-pkg/contrib/tarfile.cc: limit tar item sizes to 128 GiB
+    - apt-pkg/deb/debfile.cc: limit control file sizes to 64 MiB
+    - test/*: add tests.
+    - CVE-2020-27350
+  * Additional hardening:
+    - apt-pkg/contrib/tarfile.cc: Limit size of long names and links to 1 MiB
+  * .gitlab-ci.yml: Build on bullseye, not unstable
+
+  [ Jordi Mallach ]
+  * Fix typo in Catalan translation.
+
+  [ Helge Kreutzmann ]
+  * German program translation update (Closes: #977938)
+
+ -- Julian Andres Klode <jak@debian.org>  Sun, 27 Dec 2020 11:51:58 +0100
+
 apt (2.1.12) unstable; urgency=medium
 
   [ Julian Andres Klode ]
@@ -135,12 +219,6 @@ apt (2.1.12) unstable; urgency=medium
 
  -- Julian Andres Klode <jak@debian.org>  Mon, 23 Nov 2020 17:52:37 +0100
 
-apt (2.1.11+parrot1) rolling-testing; urgency=medium
-
-  * NImport new Debian release.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Mon, 16 Nov 2020 14:01:10 +0100
-
 apt (2.1.11) unstable; urgency=medium
 
   [ JCGoran ]
@@ -155,13 +233,6 @@ apt (2.1.11) unstable; urgency=medium
   * Dutch manpages translation update (Closes: #970037)
 
  -- Julian Andres Klode <juliank@ubuntu.com>  Wed, 21 Oct 2020 11:53:18 +0200
-
-
-apt (2.1.10+parrot1) rolling-testing; urgency=medium
-
-  * Import new Debian release.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Fri, 14 Aug 2020 19:29:22 +0200
 
 apt (2.1.10) unstable; urgency=medium
 
@@ -193,12 +264,6 @@ apt (2.1.9) unstable; urgency=medium
 
  -- Julian Andres Klode <jak@debian.org>  Mon, 10 Aug 2020 14:16:23 +0200
 
-apt (2.1.8+parrot1) rolling-testing; urgency=medium
-
-  * Import new Debian release.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Wed, 12 Aug 2020 01:01:03 +0200
-
 apt (2.1.8) unstable; urgency=medium
 
   [ Julian Andres Klode ]
@@ -222,13 +287,6 @@ apt (2.1.8) unstable; urgency=medium
   * Support marking all newly installed packages as automatically installed
 
  -- Julian Andres Klode <jak@debian.org>  Tue, 04 Aug 2020 12:41:28 +0200
-
-apt (2.1.7+parrot1) rolling-testing; urgency=medium
-
-  * Import new Debian version.
-  * Re-enable https-to-http redirects.
-
- -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Sat, 18 Jul 2020 16:27:55 +0200
 
 apt (2.1.7) unstable; urgency=medium
 
@@ -289,48 +347,54 @@ apt (2.1.5) unstable; urgency=medium
 
  -- Julian Andres Klode <jak@debian.org>  Tue, 26 May 2020 12:19:40 +0200
 
+
+apt (2.1.4+parrot1) rolling; urgency=medium
+
+  * Import new Debian package.
+
+ -- Lorenzo "Palinuro" Faletra <palinuro@parrotsec.org>  Tue, 26 May 2020 15:43:35 +0200
+
 apt (2.1.4) unstable; urgency=medium
 
-  [ David Kalnischkies ]
-  * Check satisfiability for versioned provides, not providing version
+[ David Kalnischkies ]
+* Check satisfiability for versioned provides, not providing version
 
- -- Julian Andres Klode <jak@debian.org>  Tue, 19 May 2020 11:28:59 +0200
+-- Julian Andres Klode <jak@debian.org>  Tue, 19 May 2020 11:28:59 +0200
 
 apt (2.1.3) unstable; urgency=medium
 
-  [ David Kalnischkies ]
-  * Prefer use of O_TMPFILE in GetTempFile if available
-  * Allow prefix to be a complete filename for GetTempFile
-  * Properly handle interrupted write() call in ExtractTar
-  * Skip reading data from tar members if nobody will look at it
-  * Keep going if a dep is bad for user requests to improve errors
-  * Support negative dependencies in VCI::FromDependency
-  * Deal with protected solution providers first
-  * Propagate protected to already satisfied conflicts (Closes: #960705)
-  * Propagate protected to already satisfied dependencies
-  * Recognize propagated protected in pkgProblemResolver
+[ David Kalnischkies ]
+* Prefer use of O_TMPFILE in GetTempFile if available
+* Allow prefix to be a complete filename for GetTempFile
+* Properly handle interrupted write() call in ExtractTar
+* Skip reading data from tar members if nobody will look at it
+* Keep going if a dep is bad for user requests to improve errors
+* Support negative dependencies in VCI::FromDependency
+* Deal with protected solution providers first
+* Propagate protected to already satisfied conflicts (Closes: #960705)
+* Propagate protected to already satisfied dependencies
+* Recognize propagated protected in pkgProblemResolver
 
-  [ Julian Andres Klode ]
-  * private-search: Only use V.TranslatedDescription() if good (LP: #1877987)
+[ Julian Andres Klode ]
+* private-search: Only use V.TranslatedDescription() if good (LP: #1877987)
 
- -- Julian Andres Klode <jak@debian.org>  Mon, 18 May 2020 22:23:27 +0200
+-- Julian Andres Klode <jak@debian.org>  Mon, 18 May 2020 22:23:27 +0200
 
 apt (2.1.2) unstable; urgency=critical
 
-  [ Julian Andres Klode ]
-  * SECURITY UPDATE: Out of bounds read in ar, tar implementations (LP: #1878177)
-    - apt-pkg/contrib/arfile.cc: Fix out-of-bounds read in member name
-    - apt-pkg/contrib/arfile.cc: Fix out-of-bounds read on unterminated
-      member names in error path
-    - apt-pkg/contrib/extracttar.cc: Fix out-of-bounds read on unterminated
-      member names in error path
-    - CVE-2020-3810
+[ Julian Andres Klode ]
+* SECURITY UPDATE: Out of bounds read in ar, tar implementations (LP: #1878177)
+- apt-pkg/contrib/arfile.cc: Fix out-of-bounds read in member name
+- apt-pkg/contrib/arfile.cc: Fix out-of-bounds read on unterminated
+member names in error path
+- apt-pkg/contrib/extracttar.cc: Fix out-of-bounds read on unterminated
+member names in error path
+- CVE-2020-3810
 
-  [ Frans Spiesschaert ]
-  * Dutch program translation update (Closes: #960186)
+[ Frans Spiesschaert ]
+* Dutch program translation update (Closes: #960186)
 
- -- Julian Andres Klode <jak@debian.org>  Wed, 13 May 2020 22:04:47 +0200
-
+-- Julian Andres Klode <jak@debian.org>  Wed, 13 May 2020 22:04:47 +0200
 
 apt (2.1.1+parrot1) rolling; urgency=medium
 

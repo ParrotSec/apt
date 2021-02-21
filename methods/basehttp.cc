@@ -110,6 +110,9 @@ bool RequestState::HeaderLine(string const &Line)			/*{{{*/
 	 if (sscanf(Line.c_str(),"HTTP %3u%359[^\n]",&Result,Code) != 2)
 	    return _error->Error(_("The HTTP server sent an invalid reply header"));
       }
+      auto const CodeLen = strlen(Code);
+      auto const CodeEnd = std::remove_if(Code, Code + CodeLen, [](char c) { return isprint(c) == 0; });
+      *CodeEnd = '\0';
 
       /* Check the HTTP response header to get the default persistence
          state. */
@@ -388,9 +391,9 @@ BaseHttpMethod::DealWithHeaders(FetchResult &Res, RequestState &Req)
 	 // as well as http to https
 	 else if ((Uri.Access == "http" || Uri.Access == "https+http") && tmpURI.Access == "https")
 	    return TRY_AGAIN_OR_REDIRECT;
-	 // allow https to http redirects (for https mirrordirectors with http mirrors)
-	 else if ((Uri.Access == "https" || Uri.Access == "https+http") && tmpURI.Access == "http")
-	 	return TRY_AGAIN_OR_REDIRECT;
+	// allow https to http redirects (for https mirrordirectors with http mirrors)
+         else if ((Uri.Access == "https" || Uri.Access == "https+http") && tmpURI.Access == "http")
+            return TRY_AGAIN_OR_REDIRECT;
 	 else
 	 {
 	    auto const tmpplus = tmpURI.Access.find('+');
@@ -765,7 +768,9 @@ int BaseHttpMethod::Loop()
 			// yes, he did! Disable pipelining and rewrite queue
 			if (Server->Pipeline == true)
 			{
-			   Warning(_("Automatically disabled %s due to incorrect response from server/proxy. (man 5 apt.conf)"), "Acquire::http::Pipeline-Depth");
+			   std::string msg;
+			   strprintf(msg, _("Automatically disabled %s due to incorrect response from server/proxy. (man 5 apt.conf)"), "Acquire::http::Pipeline-Depth");
+			   Warning(std::move(msg));
 			   Server->Pipeline = false;
 			   Server->PipelineAllowed = false;
 			   // we keep the PipelineDepth value so that the rest of the queue can be fixed up as well

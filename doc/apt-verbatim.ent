@@ -231,7 +231,7 @@
   </citerefentry>"
 >
 
-<!ENTITY apt-acquire-additional-files "<literal><filename>/usr/share/doc/apt-doc/acquire-additional-files.md.gz</filename></literal>">
+<!ENTITY apt-acquire-additional-files "<literal><filename>/usr/share/doc/apt/acquire-additional-files.md.gz</filename></literal>">
 
 <!-- Boiler plate docinfo section -->
 <!ENTITY apt-email "
@@ -274,7 +274,7 @@
 ">
 
 <!-- this will be updated by 'prepare-release' -->
-<!ENTITY apt-product-version "2.1.18">
+<!ENTITY apt-product-version "2.1.20">
 
 <!-- (Code)names for various things used all over the place -->
 <!ENTITY debian-oldstable-codename "buster">
