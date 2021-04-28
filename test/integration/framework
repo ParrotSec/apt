@@ -486,6 +486,10 @@ EOF
 
 	echo 'APT::Machine-ID "912e43bd1c1d4ba481f9f8ccab25f9ee";' > rootdir/etc/apt/apt.conf.d/machine-id
 
+	# XXX: We really ought to make the packages in the test suite all have Size fields.
+	# But this needs a lot more changes, so let's keep it simple for stable updates.
+	echo 'Acquire::AllowUnsizedPackages "true";' >> rootdir/etc/apt/apt.conf.d/temporary-allow-unsized-packages
+
 	configcompression '.' 'gz' #'bz2' 'lzma' 'xz'
 	confighashes 'SHA256' # these are tests, not security best-practices
 
@@ -2126,6 +2130,9 @@ aptautotest() {
 	fi
 }
 
+cdfind() {
+	( cd /; find "$@" )
+}
 aptautotest_aptget_update() {
 	local TESTCALL="$1"
 	while [ -n "$2" ]; do
@@ -2135,24 +2142,21 @@ aptautotest_aptget_update() {
 	if ! test -d "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists"; then return; fi
 	testfilestats "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt" '%U:%G:%a' '=' "${TEST_DEFAULT_USER}:${TEST_DEFAULT_GROUP}:755"
 	testfilestats "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists" '%U:%G:%a' '=' "${TEST_DEFAULT_USER}:${TEST_DEFAULT_GROUP}:755"
-	(
-	cd /
 	# all copied files are properly chmodded
 	local backupIFS="$IFS"
 	IFS="$(printf "\n\b")"
-	find "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists" -type f ! -name 'lock' | while read file; do
+	cdfind "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists" -type f ! -name 'lock' | while read file; do
 		testfilestats "$file" '%U:%G:%a' '=' "${TEST_DEFAULT_USER}:${TEST_DEFAULT_GROUP}:644"
 	done
 	IFS="$backupIFS"
 	if [ "$TESTCALL" = 'testsuccess' ]; then
 		# failure cases can retain partial files and such
-		testempty find "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists/partial" -mindepth 1 ! \( -name 'lock' -o -name '*.FAILED' \)
+		testempty cdfind "${TMPWORKINGDIRECTORY}/rootdir/var/lib/apt/lists/partial" -mindepth 1 ! \( -name 'lock' -o -name '*.FAILED' \)
 	fi
 	if [ -s "${TMPWORKINGDIRECTORY}/rootdir/var/log/aptgetupdate.before.lst" ]; then
 		testfileequal "${TMPWORKINGDIRECTORY}/rootdir/var/log/aptgetupdate.before.lst" \
-			"$(find "${TMPWORKINGDIRECTORY}/aptarchive/dists" -type f | while read line; do stat --format '%U:%G:%a:%n' "$line"; done | sort)"
+			"$(cdfind "${TMPWORKINGDIRECTORY}/aptarchive/dists" -type f | while read line; do stat --format '%U:%G:%a:%n' "$line"; done | sort)"
 	fi
-	)
 }
 aptautotest_apt_update() { aptautotest_aptget_update "$@"; }
 aptautotest_aptcdrom_add() { aptautotest_aptget_update "$@"; }
